@@ -1,5 +1,6 @@
 import tkinter as tk
 from tkinter import filedialog
+import os
 
 def on_microphone_click():
     print("Microphone button clicked")
@@ -35,7 +36,8 @@ def on_upload_audio():
     file_path = filedialog.askopenfilename(title="Upload Audio File", filetypes=[("Audio Files", "*.mp3;*.wav")])
     if file_path:
         print(f"Selected file: {file_path}")
-        selected_file_label.config(text=f"Selected File: {file_path}")
+        shortened_file_name = shorten_file_name(file_path, max_chars=15)
+        selected_file_label.config(text=f"Selected File: {shortened_file_name}")
         convert_button.config(state=tk.NORMAL)  # Enable the Convert button
 
 def on_upload_effects():
@@ -52,6 +54,13 @@ def on_convert():
 def on_closing():
     print("Window closed")
     window.destroy()
+
+def shorten_file_name(file_path, max_chars):
+    file_name = os.path.basename(file_path)
+    if len(file_name) <= max_chars:
+        return file_name
+    else:
+        return file_name[:max_chars - 3] + "..."
 
 # Create the main window
 window = tk.Tk()
@@ -71,7 +80,7 @@ audio_buttons = []
 selected_audio_button = None  # Variable to track the selected button
 for i in range(0, 3):
     audio_button = tk.Button(window, text=f"Audio {i}", command=lambda i=i: on_audio_click(i), background=default_button_color, font=("Helvetica", 10, "bold"))
-    audio_button.grid(row=i, column=1, padx=10, pady=10)
+    audio_button.grid(row=i, column=1, padx=10, pady=5)
     audio_button.data = {"original_color": default_button_color}
     audio_buttons.append(audio_button)
 
@@ -92,11 +101,11 @@ file_menu.add_command(label="Upload Effects", command=on_upload_effects)
 
 # Create a label to display the selected file name
 selected_file_label = tk.Label(window, text="Selected File: None", font=("Helvetica", 10))
-selected_file_label.grid(row=3, column=0, columnspan=3, pady=10)
+selected_file_label.grid(row=3, column=0, columnspan=2, pady=5)
 
-# Create a "Convert" button
+# Create a "Convert" button with additional space and adjusted column span
 convert_button = tk.Button(window, text="Convert", command=on_convert, state=tk.DISABLED, font=("Helvetica", 10, "bold"))
-convert_button.grid(row=4, column=0, columnspan=3, pady=10)
+convert_button.grid(row=3, column=2, padx=10, pady=5)
 
 # Bind the closing function to the window close event
 window.protocol("WM_DELETE_WINDOW", on_closing)
