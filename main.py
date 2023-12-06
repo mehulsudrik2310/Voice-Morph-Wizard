@@ -1,6 +1,53 @@
 import tkinter as tk
-from tkinter import filedialog
+from tkinter import filedialog, ttk
 import os
+from pydub import AudioSegment
+import simpleaudio as sa
+import threading
+import time
+
+# Initialize global variables
+selected_file_path = None
+play_obj = None
+audio_length = 0
+is_playing = False
+paused_position = 0  # Track the paused position
+
+def play_audio():
+    global selected_file_path, play_obj, is_playing, paused_position
+    if selected_file_path and not is_playing:
+        audio = AudioSegment.from_file(selected_file_path)
+        # If resuming from a pause, play from the paused position
+        if paused_position > 0:
+            audio = audio[paused_position:]
+        play_obj = sa.play_buffer(audio.raw_data, num_channels=audio.channels, bytes_per_sample=audio.sample_width, sample_rate=audio.frame_rate)
+        is_playing = True
+        paused_position = 0
+        threading.Thread(target=update_play_bar, daemon=True).start()
+        # Update button states
+        play_button.config(state=tk.DISABLED)
+        pause_button.config(state=tk.NORMAL)
+
+def pause_audio():
+    global play_obj, is_playing, paused_position
+    if play_obj and is_playing:
+        play_obj.stop()
+        is_playing = False
+        # Update paused_position to the current position
+        paused_position = int(play_bar.get() * 1000)  # Convert to milliseconds
+        # Update button states
+        play_button.config(state=tk.NORMAL)
+        pause_button.config(state=tk.DISABLED)
+
+def update_play_bar():
+    global is_playing, play_obj, paused_position
+    start_time = time.time()
+    while is_playing and play_obj.is_playing():
+        current_pos = (time.time() - start_time) + paused_position / 1000  # in seconds
+        play_bar.set(current_pos)
+        if current_pos >= audio_length:
+            break
+        time.sleep(0.1)
 
 def on_microphone_click():
     print("Microphone button clicked")
@@ -9,20 +56,16 @@ def on_microphone_click():
 def on_audio_click(audio_number):
     print(f"Audio {audio_number} button clicked")
     global selected_audio_button
-    # Deselect the previously selected button (if any)
     if selected_audio_button and selected_audio_button != output_button:
         toggle_button_color(selected_audio_button)
-    # If the same button is clicked again, set selected_audio_button to None
     if selected_audio_button == audio_buttons[audio_number]:
         selected_audio_button = None
     else:
-        # Select the clicked button
         selected_audio_button = audio_buttons[audio_number]
         toggle_button_color(selected_audio_button)
 
 def on_output_click():
     print("Output button clicked")
-    # Do something when the Output button is clicked
 
 def toggle_button_color(button):
     current_color = button.cget("background")
@@ -33,12 +76,33 @@ def toggle_button_color(button):
         button.configure(background=original_color)
 
 def on_upload_audio():
+    global selected_file_path, audio_length, paused_position, is_playing, play_obj
     file_path = filedialog.askopenfilename(title="Upload Audio File", filetypes=[("Audio Files", "*.mp3;*.wav")])
     if file_path:
+        # Stop currently playing audio, if any
+        if play_obj:
+            play_obj.stop()
+
+        # Reset playback variables
+        is_playing = False
+        paused_position = 0
+        play_bar.set(0)
+
+        # Update UI elements
         print(f"Selected file: {file_path}")
         shortened_file_name = shorten_file_name(file_path, max_chars=15)
         selected_file_label.config(text=f"Selected File: {shortened_file_name}")
         convert_button.config(state=tk.NORMAL)  # Enable the Convert button
+        selected_file_path = file_path
+
+        # Load the audio file and set the play bar's range
+        audio = AudioSegment.from_file(file_path)
+        audio_length = len(audio) / 1000  # Length of audio in seconds
+        play_bar.config(to=audio_length)
+
+        # Update button states
+        play_button.config(state=tk.NORMAL)
+        pause_button.config(state=tk.DISABLED)
 
 def on_upload_effects():
     effects_path = filedialog.askopenfilename(title="Upload Effects File", filetypes=[("Audio Files", "*.mp3;*.wav")])
@@ -52,6 +116,8 @@ def on_convert():
         # Add your conversion logic here
 
 def on_closing():
+    if play_obj:
+        play_obj.stop()
     print("Window closed")
     window.destroy()
 
@@ -67,24 +133,24 @@ window = tk.Tk()
 window.title("Voice Changer")
 
 # Set the original button color
-default_button_color = "#3498DB"  # A different default color
-selected_button_color = "#2ECC71"  # A green color when selected
+default_button_color = "#3498DB"
+selected_button_color = "#2ECC71"
 
-# Create and place the Microphone button with a modern style
+# Create and place the Microphone button
 microphone_button = tk.Button(window, text="Microphone", command=on_microphone_click, background=default_button_color, font=("Helvetica", 10, "bold"))
 microphone_button.grid(row=0, column=0, padx=10, pady=10)
 microphone_button.data = {"original_color": default_button_color}
 
-# Create and place the Audio buttons in the second column with a modern style
+# Create and place the Audio buttons
 audio_buttons = []
-selected_audio_button = None  # Variable to track the selected button
-for i in range(0, 3):
+selected_audio_button = None
+for i in range(3):
     audio_button = tk.Button(window, text=f"Audio {i}", command=lambda i=i: on_audio_click(i), background=default_button_color, font=("Helvetica", 10, "bold"))
     audio_button.grid(row=i, column=1, padx=10, pady=5)
     audio_button.data = {"original_color": default_button_color}
     audio_buttons.append(audio_button)
 
-# Create and place the Output button in the third column with a modern style
+# Create and place the Output button
 output_button = tk.Button(window, text="Output", command=on_output_click, background=default_button_color, font=("Helvetica", 10, "bold"))
 output_button.grid(row=0, column=2, padx=10, pady=10)
 output_button.data = {"original_color": default_button_color}
@@ -103,9 +169,20 @@ file_menu.add_command(label="Upload Effects", command=on_upload_effects)
 selected_file_label = tk.Label(window, text="Selected File: None", font=("Helvetica", 10))
 selected_file_label.grid(row=3, column=0, columnspan=2, pady=5)
 
-# Create a "Convert" button with additional space and adjusted column span
+# Create a "Convert" button
 convert_button = tk.Button(window, text="Convert", command=on_convert, state=tk.DISABLED, font=("Helvetica", 10, "bold"))
 convert_button.grid(row=3, column=2, padx=10, pady=5)
+
+# Create a play bar
+play_bar = ttk.Scale(window, from_=0, to=100, orient='horizontal')
+play_bar.grid(row=4, column=0, columnspan=3, padx=10, pady=5, sticky='ew')
+
+# Create separate play and pause buttons
+play_button = tk.Button(window, text="Play", command=play_audio, state=tk.NORMAL)
+play_button.grid(row=5, column=0, padx=10, pady=5)
+
+pause_button = tk.Button(window, text="Pause", command=pause_audio, state=tk.DISABLED)
+pause_button.grid(row=5, column=1, padx=10, pady=5)
 
 # Bind the closing function to the window close event
 window.protocol("WM_DELETE_WINDOW", on_closing)
