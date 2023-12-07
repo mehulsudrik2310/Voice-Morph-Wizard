@@ -12,37 +12,54 @@ play_obj = None
 audio_length = 0
 is_playing = False
 paused_position = 0  # Track the paused position
+update_bar_thread_running = False  # New flag to control the thread
 
 def play_audio():
-    global selected_file_path, play_obj, is_playing, paused_position
-    if selected_file_path and not is_playing:
+    global selected_file_path, play_obj, is_playing, paused_position, update_bar_thread_running
+    if selected_file_path:
+        # Signal to stop the current play bar update thread
+        update_bar_thread_running = False
+
+        if play_obj:
+            play_obj.stop()
+
+        # Wait briefly to ensure the thread stops
+        time.sleep(0.1)
+
+        play_bar.set(0)
         audio = AudioSegment.from_file(selected_file_path)
-        # If resuming from a pause, play from the paused position
-        if paused_position > 0:
-            audio = audio[paused_position:]
         play_obj = sa.play_buffer(audio.raw_data, num_channels=audio.channels, bytes_per_sample=audio.sample_width, sample_rate=audio.frame_rate)
         is_playing = True
         paused_position = 0
+
+        # Start a new thread to update the play bar
+        update_bar_thread_running = True
         threading.Thread(target=update_play_bar, daemon=True).start()
         # Update button states
-        play_button.config(state=tk.DISABLED)
-        pause_button.config(state=tk.NORMAL)
+        toggle_button.config(text="Pause", state=tk.NORMAL)
 
-def pause_audio():
-    global play_obj, is_playing, paused_position
-    if play_obj and is_playing:
+def toggle_pause_continue():
+    global play_obj, is_playing, paused_position, update_bar_thread_running
+    if is_playing:
+        # Pause the audio
         play_obj.stop()
         is_playing = False
-        # Update paused_position to the current position
         paused_position = int(play_bar.get() * 1000)  # Convert to milliseconds
-        # Update button states
-        play_button.config(state=tk.NORMAL)
-        pause_button.config(state=tk.DISABLED)
+        toggle_button.config(text="Continue")
+    else:
+        # Continue playing from paused position
+        if selected_file_path:
+            audio = AudioSegment.from_file(selected_file_path)
+            audio = audio[paused_position:]
+            play_obj = sa.play_buffer(audio.raw_data, num_channels=audio.channels, bytes_per_sample=audio.sample_width, sample_rate=audio.frame_rate)
+            is_playing = True
+            threading.Thread(target=update_play_bar, daemon=True).start()
+            toggle_button.config(text="Pause")
 
 def update_play_bar():
-    global is_playing, play_obj, paused_position
+    global is_playing, play_obj, paused_position, update_bar_thread_running
     start_time = time.time()
-    while is_playing and play_obj.is_playing():
+    while is_playing and play_obj.is_playing() and update_bar_thread_running:
         current_pos = (time.time() - start_time) + paused_position / 1000  # in seconds
         play_bar.set(current_pos)
         if current_pos >= audio_length:
@@ -102,7 +119,7 @@ def on_upload_audio():
 
         # Update button states
         play_button.config(state=tk.NORMAL)
-        pause_button.config(state=tk.DISABLED)
+        toggle_button.config(state=tk.DISABLED, text="Pause")
 
 def on_upload_effects():
     effects_path = filedialog.askopenfilename(title="Upload Effects File", filetypes=[("Audio Files", "*.mp3;*.wav")])
@@ -116,8 +133,10 @@ def on_convert():
         # Add your conversion logic here
 
 def on_closing():
+    global update_bar_thread_running
     if play_obj:
         play_obj.stop()
+    update_bar_thread_running = False
     print("Window closed")
     window.destroy()
 
@@ -177,12 +196,12 @@ convert_button.grid(row=3, column=2, padx=10, pady=5)
 play_bar = ttk.Scale(window, from_=0, to=100, orient='horizontal')
 play_bar.grid(row=4, column=0, columnspan=3, padx=10, pady=5, sticky='ew')
 
-# Create separate play and pause buttons
+# Create play and toggle (pause/continue) buttons
 play_button = tk.Button(window, text="Play", command=play_audio, state=tk.NORMAL)
 play_button.grid(row=5, column=0, padx=10, pady=5)
 
-pause_button = tk.Button(window, text="Pause", command=pause_audio, state=tk.DISABLED)
-pause_button.grid(row=5, column=1, padx=10, pady=5)
+toggle_button = tk.Button(window, text="Pause", command=toggle_pause_continue, state=tk.DISABLED)
+toggle_button.grid(row=5, column=1, padx=10, pady=5)
 
 # Bind the closing function to the window close event
 window.protocol("WM_DELETE_WINDOW", on_closing)
