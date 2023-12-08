@@ -234,8 +234,10 @@ def on_upload_audio():
         raw_play_button.config(state=tk.NORMAL)
         raw_pause_continue_button.config(state=tk.DISABLED, text="Pause")
 
-        # Make the play bar visible
+        # Make the play bar and the play pause button visible
         raw_play_bar.grid()  
+        raw_play_button.grid()
+        raw_pause_continue_button.grid()
 
 
 def on_upload_effects():
@@ -331,9 +333,11 @@ raw_play_bar.grid_remove()  # Hide the play bar initially
 # Create play and toggle (pause/continue) buttons
 raw_play_button = tk.Button(window, text="Play", command=play_audio, state=tk.NORMAL)
 raw_play_button.grid(row=5, column=0, padx=10, pady=5, sticky='nsew')
+raw_play_button.grid_remove()  # Hide the play bar initially
 
 raw_pause_continue_button = tk.Button(window, text="Pause", command=toggle_pause_continue, state=tk.DISABLED)
 raw_pause_continue_button.grid(row=5, column=1, padx=10, pady=5, sticky='nsew')
+raw_pause_continue_button.grid_remove()  # Hide the play bar initially
 
 # Bind the closing function to the window close event
 window.protocol("WM_DELETE_WINDOW", on_closing)
