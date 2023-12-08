@@ -14,6 +14,13 @@ is_playing = False
 paused_position = 0  # Track the paused position
 update_bar_thread_running = False  # New flag to control the thread
 
+# Function to set the minimum size of the window to its current size
+def set_min_size():
+    window.update_idletasks()  # Update the window to ensure it's fully rendered
+    set_minimum_width = window.winfo_width()
+    set_minimum_height = window.winfo_height()
+    window.minsize(set_minimum_width, set_minimum_height)
+
 def play_audio():
     # Access global variables that will be modified in this function
     global selected_file_path, play_obj, is_playing, paused_position, update_bar_thread_running
@@ -195,13 +202,19 @@ def shorten_file_name(file_path, max_chars):
 window = tk.Tk()
 window.title("Voice Changer")
 
+# Configure the grid rows and columns to expand proportionally
+for i in range(6):  # Adjust the range based on your number of rows
+    window.rowconfigure(i, weight=1)
+for j in range(3):  # Adjust the range based on your number of columns
+    window.columnconfigure(j, weight=1)
+
 # Set the original button color
 default_button_color = "#3498DB"
 selected_button_color = "#2ECC71"
 
 # Create and place the Microphone button
 microphone_button = tk.Button(window, text="Microphone", command=on_microphone_click, background=default_button_color, font=("Helvetica", 10, "bold"))
-microphone_button.grid(row=0, column=0, padx=10, pady=10)
+microphone_button.grid(row=0, column=0, padx=10, pady=10, sticky='nsew')
 microphone_button.data = {"original_color": default_button_color}
 
 # Create and place the Audio buttons
@@ -209,13 +222,13 @@ audio_buttons = []
 selected_audio_button = None
 for i in range(3):
     audio_button = tk.Button(window, text=f"Audio {i}", command=lambda i=i: on_audio_click(i), background=default_button_color, font=("Helvetica", 10, "bold"))
-    audio_button.grid(row=i, column=1, padx=10, pady=5)
+    audio_button.grid(row=i, column=1, padx=10, pady=5, sticky='nsew')
     audio_button.data = {"original_color": default_button_color}
     audio_buttons.append(audio_button)
 
 # Create and place the Output button
 output_button = tk.Button(window, text="Output", command=on_output_click, background=default_button_color, font=("Helvetica", 10, "bold"))
-output_button.grid(row=0, column=2, padx=10, pady=10)
+output_button.grid(row=0, column=2, padx=10, pady=10, sticky='nsew')
 output_button.data = {"original_color": default_button_color}
 
 # Create a menu bar
@@ -230,11 +243,11 @@ file_menu.add_command(label="Upload Effects", command=on_upload_effects)
 
 # Create a label to display the selected file name
 selected_file_label = tk.Label(window, text="Selected File: None", font=("Helvetica", 10))
-selected_file_label.grid(row=3, column=0, columnspan=2, pady=5)
+selected_file_label.grid(row=3, column=0, columnspan=2, pady=5, sticky='nsew')
 
 # Create a "Convert" button
 convert_button = tk.Button(window, text="Convert", command=on_convert, state=tk.DISABLED, font=("Helvetica", 10, "bold"))
-convert_button.grid(row=3, column=2, padx=10, pady=5)
+convert_button.grid(row=3, column=2, padx=10, pady=5, sticky='nsew')
 
 # Create a play bar
 play_bar = ttk.Scale(window, from_=0, to=100, orient='horizontal')
@@ -242,13 +255,16 @@ play_bar.grid(row=4, column=0, columnspan=3, padx=10, pady=5, sticky='ew')
 
 # Create play and toggle (pause/continue) buttons
 play_button = tk.Button(window, text="Play", command=play_audio, state=tk.NORMAL)
-play_button.grid(row=5, column=0, padx=10, pady=5)
+play_button.grid(row=5, column=0, padx=10, pady=5, sticky='nsew')
 
 toggle_button = tk.Button(window, text="Pause", command=toggle_pause_continue, state=tk.DISABLED)
-toggle_button.grid(row=5, column=1, padx=10, pady=5)
+toggle_button.grid(row=5, column=1, padx=10, pady=5, sticky='nsew')
 
 # Bind the closing function to the window close event
 window.protocol("WM_DELETE_WINDOW", on_closing)
+
+# After all widgets are added, call the function to set the minimum size
+set_min_size()
 
 # Start the Tkinter event loop
 window.mainloop()
