@@ -92,6 +92,10 @@ def play_audio():
 #     # Update paused_position to the new value in milliseconds
 #     paused_position = int(new_value * 1000)
 
+def on_window_resize(event):
+    # Update lines on window resize
+    update_lines()
+
 def toggle_pause_continue():
     # Access global variables that will be modified in this function
     global play_obj, is_playing, paused_position, update_bar_thread_running
@@ -329,6 +333,12 @@ toggle_button.grid(row=5, column=1, padx=10, pady=5, sticky='nsew')
 
 # Bind the closing function to the window close event
 window.protocol("WM_DELETE_WINDOW", on_closing)
+
+# Bind the window resize event
+window.bind("<Configure>", on_window_resize)
+
+# Disable resizing of the window
+window.resizable(True, True)
 
 # After all widgets are added, call the function to set the minimum size
 set_min_size()
