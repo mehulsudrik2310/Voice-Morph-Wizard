@@ -13,6 +13,8 @@ audio_length = 0
 is_playing = False
 paused_position = 0  # Track the paused position
 update_bar_thread_running = False  # New flag to control the thread
+num_audio_buttons = 3 # Number of audio buttons\# Calculate the middle row position
+middle_row = num_audio_buttons // 2
 
 # Function to set the minimum size of the window to its current size
 def set_min_size():
@@ -169,8 +171,26 @@ def toggle_button_color(button):
     original_color = button.data["original_color"]
     if current_color == original_color:
         button.configure(background="#2ECC71")  # Change to green when selected
+        update_lines()  # Call to update lines when a button is toggled
     else:
         button.configure(background=original_color)
+        update_lines()
+
+def draw_line(start_button, end_button):
+    start_x = start_button.winfo_x() + start_button.winfo_width() / 2
+    start_y = start_button.winfo_y() + start_button.winfo_height() / 2
+    end_x = end_button.winfo_x() + end_button.winfo_width() / 2
+    end_y = end_button.winfo_y() + end_button.winfo_height() / 2
+    canvas.create_line(start_x, start_y, end_x, end_y, fill="red", width=2)  # Adjust color and width as needed
+
+def update_lines():
+    canvas.delete("all")  # Clear existing lines
+    if microphone_button.cget("background") == "#2ECC71":  # Check if microphone is 'on'
+        for audio_button in audio_buttons:
+            if audio_button.cget("background") == "#2ECC71":  # Check if any audio button is 'on'
+                draw_line(microphone_button, audio_button)
+                draw_line(audio_button, output_button)
+
 
 def on_upload_audio():
     # Access the global variables that will be modified in this function
@@ -251,23 +271,27 @@ for j in range(3):  # Adjust the range based on your number of columns
 default_button_color = "#3498DB"
 selected_button_color = "#2ECC71"
 
-# Create and place the Microphone button
-microphone_button = tk.Button(window, text="Microphone", command=on_microphone_click, background=default_button_color, font=("Helvetica", 10, "bold"))
-microphone_button.grid(row=0, column=0, padx=10, pady=10, sticky='nsew')
+# Create the canvas and place it below the buttons
+canvas = tk.Canvas(window, height=200, width=300)  # Adjust size as needed
+canvas.grid(row=0, column=0, rowspan=6, columnspan=3, sticky='nsew')
+
+# Create and place the Microphone button in the middle of the audio button stack
+microphone_button = tk.Button(window, text="Microphone", command=on_microphone_click, background=default_button_color, font=("Helvetica", 10, "bold"), width=13, height=1)
+microphone_button.grid(row=middle_row, column=0, padx=10, pady=10, sticky='nsew')
 microphone_button.data = {"original_color": default_button_color}
 
 # Create and place the Audio buttons
 audio_buttons = []
 selected_audio_button = None
-for i in range(3):
+for i in range(num_audio_buttons):
     audio_button = tk.Button(window, text=f"Audio {i}", command=lambda i=i: on_audio_click(i), background=default_button_color, font=("Helvetica", 10, "bold"))
-    audio_button.grid(row=i, column=1, padx=10, pady=5, sticky='nsew')
+    audio_button.grid(row=i, column=1, padx=35, pady=15, sticky='nsew')
     audio_button.data = {"original_color": default_button_color}
     audio_buttons.append(audio_button)
 
-# Create and place the Output button
-output_button = tk.Button(window, text="Output", command=on_output_click, background=default_button_color, font=("Helvetica", 10, "bold"))
-output_button.grid(row=0, column=2, padx=10, pady=10, sticky='nsew')
+# Create and place the Output button in the middle of the audio button stack
+output_button = tk.Button(window, text="Output", command=on_output_click, background=default_button_color, font=("Helvetica", 10, "bold"), width=10, height=1)
+output_button.grid(row=middle_row, column=2, padx=10, pady=10, sticky='nsew')
 output_button.data = {"original_color": default_button_color}
 
 # Create a menu bar
