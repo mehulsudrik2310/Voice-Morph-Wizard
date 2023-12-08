@@ -54,13 +54,27 @@ def play_audio():
         # Update the state of toggle button to show "Pause" and enable it
         toggle_button.config(text="Pause", state=tk.NORMAL)
 
-def on_slider_move(event):
-    # Access global variable to update the paused position
-    global paused_position
+# def on_slider_move(event):
+#     # Access global variables that will be modified in this function
+#     global play_obj, is_playing, paused_position, update_bar_thread_running
 
-    # Update paused_position when the slider is moved manually
-    # This ensures that the playback position matches the slider's position
-    paused_position = int(play_bar.get() * 1000)  # Convert slider position to milliseconds
+#     if is_playing:
+#         # Stop any currently playing audio
+#         if play_obj:
+#             play_obj.stop()
+
+#         # Calculate the new playback position from the slider
+#         paused_position = int(play_bar.get() * 1000)  # Convert to milliseconds
+
+#         # Load the audio file and prepare it for playback from the new position
+#         audio = AudioSegment.from_file(selected_file_path)
+#         audio = audio[paused_position:]  # Start playing from this position
+#         play_obj = sa.play_buffer(audio.raw_data, num_channels=audio.channels, bytes_per_sample=audio.sample_width, sample_rate=audio.frame_rate)
+
+#         # Start a new thread to update the play bar, if not already running
+#         if not update_bar_thread_running:
+#             update_bar_thread_running = True
+#             threading.Thread(target=update_play_bar, daemon=True).start()
 
 # def on_slider_click(event):
 #     # Access global variable
@@ -278,6 +292,8 @@ play_bar = ttk.Scale(window, from_=0, to=100, orient='horizontal')
 play_bar.grid(row=4, column=0, columnspan=3, padx=10, pady=5, sticky='ew')
 # Bind the left mouse click event to the slider
 # play_bar.bind("<Button-1>", on_slider_click)
+# Bind the slider movement event to the function
+# play_bar.bind("<B1-Motion>", on_slider_move)
 
 # Create play and toggle (pause/continue) buttons
 play_button = tk.Button(window, text="Play", command=play_audio, state=tk.NORMAL)
