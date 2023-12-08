@@ -30,23 +30,22 @@ def play_audio():
         # Signal to stop the current play bar update thread
         update_bar_thread_running = False
 
-        # Stop any currently playing audio
+        # Stop any currently playing or paused audio and reset the play bar
         if play_obj:
             play_obj.stop()
+            play_bar.set(0)  # Reset the play bar to the start
+            paused_position = 0  # Reset the paused position
 
         # Wait briefly to ensure the thread stops before starting a new playback
         time.sleep(0.1)
 
-        # Reset the play bar to the start position
-        play_bar.set(0)
-
-        # Load the audio file and prepare it for playback
+        # Load the audio file and prepare it for playback from the beginning
         audio = AudioSegment.from_file(selected_file_path)
         play_obj = sa.play_buffer(audio.raw_data, num_channels=audio.channels, bytes_per_sample=audio.sample_width, sample_rate=audio.frame_rate)
 
-        # Set flags to indicate audio is now playing and reset the paused position
+        # Set flags to indicate audio is now playing and update the paused position
         is_playing = True
-        paused_position = 0
+        paused_position = 0  # Start from the beginning
 
         # Start a new thread to update the play bar
         update_bar_thread_running = True
@@ -54,6 +53,28 @@ def play_audio():
 
         # Update the state of toggle button to show "Pause" and enable it
         toggle_button.config(text="Pause", state=tk.NORMAL)
+
+def on_slider_move(event):
+    # Access global variable to update the paused position
+    global paused_position
+
+    # Update paused_position when the slider is moved manually
+    # This ensures that the playback position matches the slider's position
+    paused_position = int(play_bar.get() * 1000)  # Convert slider position to milliseconds
+
+# def on_slider_click(event):
+#     # Access global variable
+#     global paused_position
+
+#     # Calculate the relative position (0.0 to 1.0) of the click on the slider track
+#     relative_position = event.x / play_bar.winfo_width()
+
+#     # Calculate the new value for the slider based on its range and the relative position
+#     new_value = relative_position * audio_length
+#     play_bar.set(new_value)
+
+#     # Update paused_position to the new value in milliseconds
+#     paused_position = int(new_value * 1000)
 
 def toggle_pause_continue():
     # Access global variables that will be modified in this function
@@ -70,12 +91,15 @@ def toggle_pause_continue():
         # Update the toggle button to show "Continue"
         toggle_button.config(text="Continue")
     else:
-        # Resume playing audio from the paused position
+        # Resume playing audio from the current slider position
         if selected_file_path:
             audio = AudioSegment.from_file(selected_file_path)
-            audio = audio[paused_position:]
+            # Start playing from the slider's position
+            start_position = int(play_bar.get() * 1000)  # Convert slider position to milliseconds
+            audio = audio[start_position:]  # Resume from this position
             play_obj = sa.play_buffer(audio.raw_data, num_channels=audio.channels, bytes_per_sample=audio.sample_width, sample_rate=audio.frame_rate)
             is_playing = True
+            paused_position = start_position  # Update paused_position
             threading.Thread(target=update_play_bar, daemon=True).start()
             # Update the toggle button to show "Pause"
             toggle_button.config(text="Pause")
@@ -252,6 +276,8 @@ convert_button.grid(row=3, column=2, padx=10, pady=5, sticky='nsew')
 # Create a play bar
 play_bar = ttk.Scale(window, from_=0, to=100, orient='horizontal')
 play_bar.grid(row=4, column=0, columnspan=3, padx=10, pady=5, sticky='ew')
+# Bind the left mouse click event to the slider
+# play_bar.bind("<Button-1>", on_slider_click)
 
 # Create play and toggle (pause/continue) buttons
 play_button = tk.Button(window, text="Play", command=play_audio, state=tk.NORMAL)
