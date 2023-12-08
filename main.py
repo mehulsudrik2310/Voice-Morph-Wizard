@@ -234,6 +234,9 @@ def on_upload_audio():
         play_button.config(state=tk.NORMAL)
         toggle_button.config(state=tk.DISABLED, text="Pause")
 
+        # Make the play bar visible
+        play_bar.grid()  
+
 
 def on_upload_effects():
     effects_path = filedialog.askopenfilename(title="Upload Effects File", filetypes=[("Audio Files", "*.mp3;*.wav")])
@@ -319,6 +322,7 @@ convert_button.grid(row=3, column=2, padx=10, pady=5, sticky='nsew')
 # Create a play bar
 play_bar = ttk.Scale(window, from_=0, to=100, orient='horizontal')
 play_bar.grid(row=4, column=0, columnspan=3, padx=10, pady=5, sticky='ew')
+play_bar.grid_remove()  # Hide the play bar initially
 # Bind the left mouse click event to the slider
 # play_bar.bind("<Button-1>", on_slider_click)
 # Bind the slider movement event to the function
