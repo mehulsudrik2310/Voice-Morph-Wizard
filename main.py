@@ -35,7 +35,7 @@ def play_audio():
         # Stop any currently playing or paused audio and reset the play bar
         if play_obj:
             play_obj.stop()
-            play_bar.set(0)  # Reset the play bar to the start
+            raw_play_bar.set(0)  # Reset the play bar to the start
             paused_position = 0  # Reset the paused position
 
         # Wait briefly to ensure the thread stops before starting a new playback
@@ -54,7 +54,7 @@ def play_audio():
         threading.Thread(target=update_play_bar, daemon=True).start()
 
         # Update the state of toggle button to show "Pause" and enable it
-        toggle_button.config(text="Pause", state=tk.NORMAL)
+        raw_pause_continue_button.config(text="Pause", state=tk.NORMAL)
 
 # def on_slider_move(event):
 #     # Access global variables that will be modified in this function
@@ -107,22 +107,22 @@ def toggle_pause_continue():
         # Set flags to indicate audio is now paused
         is_playing = False
         # Save the current position of the audio for resuming later
-        paused_position = int(play_bar.get() * 1000)  # Convert to milliseconds
+        paused_position = int(raw_play_bar.get() * 1000)  # Convert to milliseconds
         # Update the toggle button to show "Continue"
-        toggle_button.config(text="Continue")
+        raw_pause_continue_button.config(text="Continue")
     else:
         # Resume playing audio from the current slider position
         if selected_file_path:
             audio = AudioSegment.from_file(selected_file_path)
             # Start playing from the slider's position
-            start_position = int(play_bar.get() * 1000)  # Convert slider position to milliseconds
+            start_position = int(raw_play_bar.get() * 1000)  # Convert slider position to milliseconds
             audio = audio[start_position:]  # Resume from this position
             play_obj = sa.play_buffer(audio.raw_data, num_channels=audio.channels, bytes_per_sample=audio.sample_width, sample_rate=audio.frame_rate)
             is_playing = True
             paused_position = start_position  # Update paused_position
             threading.Thread(target=update_play_bar, daemon=True).start()
             # Update the toggle button to show "Pause"
-            toggle_button.config(text="Pause")
+            raw_pause_continue_button.config(text="Pause")
 
 def update_play_bar():
     # Access global variables used in this function
@@ -136,7 +136,7 @@ def update_play_bar():
         # Calculate the current position in the audio file
         current_pos = (time.time() - start_time) + paused_position / 1000  # in seconds
         # Update the play bar with the current position
-        play_bar.set(current_pos)
+        raw_play_bar.set(current_pos)
         # Break the loop if the end of the audio is reached
         if current_pos >= audio_length:
             break
@@ -212,7 +212,7 @@ def on_upload_audio():
         # Reset playback variables to ensure clean state for new audio
         is_playing = False
         paused_position = 0
-        play_bar.set(0)
+        raw_play_bar.set(0)
 
         # Update the UI with the selected file's name and enable the Convert button
         print(f"Selected file: {file_path}")
@@ -228,14 +228,14 @@ def on_upload_audio():
         audio_length = len(audio) / 1000  # Length of audio in seconds
 
         # Configure the play bar's range to match the length of the audio
-        play_bar.config(to=audio_length)
+        raw_play_bar.config(to=audio_length)
 
         # Reset the state of play and toggle buttons for the new audio
-        play_button.config(state=tk.NORMAL)
-        toggle_button.config(state=tk.DISABLED, text="Pause")
+        raw_play_button.config(state=tk.NORMAL)
+        raw_pause_continue_button.config(state=tk.DISABLED, text="Pause")
 
         # Make the play bar visible
-        play_bar.grid()  
+        raw_play_bar.grid()  
 
 
 def on_upload_effects():
@@ -320,20 +320,20 @@ convert_button = tk.Button(window, text="Convert", command=on_convert, state=tk.
 convert_button.grid(row=3, column=2, padx=10, pady=5, sticky='nsew')
 
 # Create a play bar
-play_bar = ttk.Scale(window, from_=0, to=100, orient='horizontal')
-play_bar.grid(row=4, column=0, columnspan=3, padx=10, pady=5, sticky='ew')
-play_bar.grid_remove()  # Hide the play bar initially
+raw_play_bar = ttk.Scale(window, from_=0, to=100, orient='horizontal')
+raw_play_bar.grid(row=4, column=0, columnspan=3, padx=10, pady=5, sticky='ew')
+raw_play_bar.grid_remove()  # Hide the play bar initially
 # Bind the left mouse click event to the slider
 # play_bar.bind("<Button-1>", on_slider_click)
 # Bind the slider movement event to the function
 # play_bar.bind("<B1-Motion>", on_slider_move)
 
 # Create play and toggle (pause/continue) buttons
-play_button = tk.Button(window, text="Play", command=play_audio, state=tk.NORMAL)
-play_button.grid(row=5, column=0, padx=10, pady=5, sticky='nsew')
+raw_play_button = tk.Button(window, text="Play", command=play_audio, state=tk.NORMAL)
+raw_play_button.grid(row=5, column=0, padx=10, pady=5, sticky='nsew')
 
-toggle_button = tk.Button(window, text="Pause", command=toggle_pause_continue, state=tk.DISABLED)
-toggle_button.grid(row=5, column=1, padx=10, pady=5, sticky='nsew')
+raw_pause_continue_button = tk.Button(window, text="Pause", command=toggle_pause_continue, state=tk.DISABLED)
+raw_pause_continue_button.grid(row=5, column=1, padx=10, pady=5, sticky='nsew')
 
 # Bind the closing function to the window close event
 window.protocol("WM_DELETE_WINDOW", on_closing)
