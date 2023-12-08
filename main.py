@@ -140,6 +140,7 @@ def update_play_bar():
 def on_microphone_click():
     print("Microphone button clicked")
     toggle_button_color(microphone_button)
+    toggle_button_color(output_button)  # Also toggle the color of the output button
 
 def on_audio_click(audio_number):
     print(f"Audio {audio_number} button clicked")
