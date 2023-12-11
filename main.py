@@ -9,6 +9,7 @@ import simpleaudio as sa
 import threading
 import time
 import numpy as np
+from tkinter import messagebox
 
 # Initialize global variables
 selected_file_path = None
@@ -295,8 +296,16 @@ def on_convert():
         # Convert the bytes to numpy array
         input_array = np.frombuffer(input_bytes, dtype='int16')
 
-        # Apply modulation to the entire array
-        modulated_array = my_modulation(input_array)
+        # Apply modulation based on selected audio button
+        if selected_audio_button == audio_buttons[0]:
+            modulated_array = my_modulation(input_array)
+        elif selected_audio_button == audio_buttons[1]:
+            modulated_array = my_modulation1(input_array)
+        elif selected_audio_button == audio_buttons[2]:
+            modulated_array = my_modulation2(input_array)
+        else:
+            show_select_audio_dialog()
+            return
 
         # Convert the modulated array back to bytes
         modulated_audio_data = modulated_array.astype('int16').tobytes()
@@ -448,6 +457,7 @@ def shorten_file_name(file_path, max_chars):
     
 def my_modulation(input):
     global theta
+    print("In modulation")
     y = np.zeros(len(input))
     for n in range(0, len(input)):
         theta = theta + ca_om
@@ -457,6 +467,37 @@ def my_modulation(input):
     while theta > math.pi:
         theta = theta - 2*math.pi
     return y
+
+def my_modulation1(input):
+    global theta
+    print("In modulation 1")
+    y = np.zeros(len(input))
+    for n in range(0, len(input)):
+        theta = theta + ca_om
+        y[n] = int( input[n] * math.cos(theta) )
+        # output_block[n] = input_block[n]  # for no processing
+    # keep theta betwen -pi and pi
+    while theta > math.pi:
+        theta = theta - 2*math.pi*math.pi
+    return y
+
+def my_modulation2(input):
+    global theta
+    print("In modulation 2")
+    y = np.zeros(len(input))
+    for n in range(0, len(input)):
+        theta = theta + ca_om
+        y[n] = int( input[n] * math.cos(theta) )
+        # output_block[n] = input_block[n]  # for no processing
+    # keep theta betwen -pi and pi
+    while theta > math.pi:
+        theta = theta - 2*math.pi*math.pi*math.pi*math.pi
+    return y
+
+def show_select_audio_dialog():
+    tk.messagebox.showinfo("Select Audio Button", "Please select an audio button before converting.")
+
+
 
 # Create the main window
 window = tk.Tk()
