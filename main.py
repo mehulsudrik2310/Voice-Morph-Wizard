@@ -1,10 +1,14 @@
+import math
 import tkinter as tk
 from tkinter import filedialog, ttk
 import os
+import wave
+import pyaudio
 from pydub import AudioSegment
 import simpleaudio as sa
 import threading
 import time
+import numpy as np
 
 # Initialize global variables
 selected_file_path = None
@@ -15,6 +19,21 @@ paused_position = 0  # Track the paused position
 update_bar_thread_running = False  # New flag to control the thread
 num_audio_buttons = 3 # Number of audio buttons\# Calculate the middle row position
 middle_row = num_audio_buttons // 2
+f0 = 800
+RATE = 16000         # frames per second
+ca_om = 2 * math.pi * f0 / RATE
+theta = 0
+BLOCKLEN = 1024
+modulated_audio_data = None
+modulated_is_playing = False
+modulated_paused_position = 0
+modulated_update_bar_thread_running = False
+modulated_play_obj = None
+modulated_audio_length = 0
+CHANNELS = 0
+RATE = 0
+WIDTH = 0
+LENGTH = 0
 
 # Function to set the minimum size of the window to its current size
 def set_min_size():
@@ -246,10 +265,117 @@ def on_upload_effects():
         print(f"Effects file uploaded: {effects_path}")
 
 def on_convert():
-    selected_file_path = selected_file_label.cget("text").replace("Selected File: ", "")
+    global selected_file_path, modulated_audio_data, modulated_audio_length, modulated_play_button, modulated_pause_continue_button, modulated_play_bar, modulated_is_playing, modulated_paused_position, modulated_update_bar_thread_running, modulated_play_obj, CHANNELS, RATE, WIDTH, LENGTH
+
     if selected_file_path:
         print(f"Converting {selected_file_path}...")
-        # Add your conversion logic here
+        wf = wave.open(selected_file_path, 'rb')
+        CHANNELS = wf.getnchannels()     # Number of channels
+        RATE = wf.getframerate()     # Sampling rate (frames/second)
+        WIDTH = wf.getsampwidth()     # Number of bytes per sample
+        LENGTH = wf.getnframes()
+
+        # Read the entire file
+        input_bytes = wf.readframes(LENGTH)
+        wf.close()  # Close the file after reading
+
+        # Convert the bytes to numpy array
+        input_array = np.frombuffer(input_bytes, dtype='int16')
+
+        # Apply modulation to the entire array
+        modulated_array = my_modulation(input_array)
+
+        # Convert the modulated array back to bytes
+        modulated_audio_data = modulated_array.astype('int16').tobytes()
+
+        # Play the modulated audio
+        # modulated_play_obj = sa.play_buffer(modulated_audio_data, num_channels=CHANNELS, bytes_per_sample=WIDTH, sample_rate=RATE)
+
+        # Set the length of the modulated audio (in seconds)
+        modulated_audio_length = LENGTH / RATE
+
+        # Now that the modulation is done, make the modulated audio controls visible
+        modulated_play_bar.config(to=modulated_audio_length)
+        modulated_play_bar.grid()
+        modulated_play_button.config(state=tk.NORMAL)
+        modulated_play_button.grid()
+        modulated_pause_continue_button.config(state=tk.DISABLED)
+        modulated_pause_continue_button.grid()
+
+        # modulated_is_playing = True
+        # modulated_paused_position = 0
+        # modulated_update_bar_thread_running = True
+        # threading.Thread(target=update_modulated_play_bar, daemon=True).start()
+
+def play_modulated_audio():
+    global modulated_audio_data, modulated_play_obj, modulated_is_playing, modulated_paused_position, modulated_update_bar_thread_running, CHANNELS, WIDTH, RATE
+
+    # Stop any existing playback (if any)
+    if modulated_play_obj:
+        modulated_play_obj.stop()
+
+    # Reset the modulated play bar and paused position
+    modulated_play_bar.set(0)
+    modulated_paused_position = 0
+
+    # Start playing the modulated audio
+    modulated_play_obj = sa.play_buffer(modulated_audio_data, num_channels=CHANNELS, bytes_per_sample=WIDTH, sample_rate=RATE)
+    modulated_is_playing = True
+    modulated_update_bar_thread_running = True
+    threading.Thread(target=update_modulated_play_bar, daemon=True).start()
+
+    # Update the toggle button to show "Pause" and enable it
+    modulated_pause_continue_button.config(text="Pause", state=tk.NORMAL)
+
+
+
+def update_modulated_play_bar():
+    global modulated_is_playing, modulated_play_obj, modulated_audio_length, modulated_paused_position, modulated_update_bar_thread_running
+
+    # Record the start time for calculating the current position
+    start_time = time.time()
+
+    while modulated_is_playing and modulated_play_obj.is_playing() and modulated_update_bar_thread_running:
+        # Calculate the current position in the audio file
+        current_pos = (time.time() - start_time) + modulated_paused_position / 1000  # in seconds
+        modulated_play_bar.set(current_pos)
+        if current_pos >= modulated_audio_length:
+            break
+        time.sleep(0.1)
+
+def toggle_modulated_pause_continue():
+    global modulated_play_obj, modulated_is_playing, modulated_paused_position, modulated_update_bar_thread_running, modulated_audio_data, CHANNELS, WIDTH, RATE
+
+    # Check if the audio is currently playing
+    if modulated_is_playing:
+        # Pause the audio
+        modulated_play_obj.stop()
+        # Set flags to indicate audio is now paused
+        modulated_is_playing = False
+        # Save the current position of the audio for resuming later
+        modulated_paused_position = int(modulated_play_bar.get() * 1000)  # Convert to milliseconds
+        # Update the toggle button to show "Continue"
+        modulated_pause_continue_button.config(text="Continue")
+        # Stop updating the play bar
+        modulated_update_bar_thread_running = False
+    else:
+        # Resume playing modulated audio from the current slider position
+        start_position = int(modulated_play_bar.get() * 1000)  # Convert slider position to milliseconds
+        modulated_audio_segment = AudioSegment(
+            data=modulated_audio_data,
+            sample_width=WIDTH,
+            frame_rate=RATE,
+            channels=CHANNELS
+        )[start_position:]
+        modulated_play_obj = sa.play_buffer(modulated_audio_segment.raw_data, num_channels=CHANNELS, bytes_per_sample=WIDTH, sample_rate=RATE)
+        modulated_is_playing = True
+        modulated_paused_position = start_position
+        modulated_update_bar_thread_running = True
+        threading.Thread(target=update_modulated_play_bar, daemon=True).start()
+        # Update the toggle button to show "Pause"
+        modulated_pause_continue_button.config(text="Pause")
+
+
 
 def on_closing():
     global update_bar_thread_running
@@ -265,6 +391,18 @@ def shorten_file_name(file_path, max_chars):
         return file_name
     else:
         return file_name[:max_chars - 3] + "..."
+    
+def my_modulation(input):
+    global theta
+    y = np.zeros(len(input))
+    for n in range(0, len(input)):
+        theta = theta + ca_om
+        y[n] = int( input[n] * math.cos(theta) )
+        # output_block[n] = input_block[n]  # for no processing
+    # keep theta betwen -pi and pi
+    while theta > math.pi:
+        theta = theta - 2*math.pi
+    return y
 
 # Create the main window
 window = tk.Tk()
@@ -338,6 +476,20 @@ raw_play_button.grid_remove()  # Hide the play bar initially
 raw_pause_continue_button = tk.Button(window, text="Pause", command=toggle_pause_continue, state=tk.DISABLED)
 raw_pause_continue_button.grid(row=5, column=1, padx=10, pady=5, sticky='nsew')
 raw_pause_continue_button.grid_remove()  # Hide the play bar initially
+
+# Create modulated play bar
+modulated_play_bar = ttk.Scale(window, from_=0, to=100, orient='horizontal')
+modulated_play_bar.grid(row=6, column=0, columnspan=3, padx=10, pady=5, sticky='ew')
+modulated_play_bar.grid_remove()  # Hide the modulated play bar initially
+
+# Create modulated play and toggle (pause/continue) buttons
+modulated_play_button = tk.Button(window, text="Play Modulated", command=play_modulated_audio, state=tk.DISABLED)
+modulated_play_button.grid(row=7, column=0, padx=10, pady=5, sticky='nsew')
+modulated_play_button.grid_remove()  # Hide the modulated play button initially
+
+modulated_pause_continue_button = tk.Button(window, text="Pause", command=toggle_modulated_pause_continue, state=tk.DISABLED)
+modulated_pause_continue_button.grid(row=7, column=1, padx=10, pady=5, sticky='nsew')
+modulated_pause_continue_button.grid_remove()  # Hide the modulated pause/continue button initially
 
 # Bind the closing function to the window close event
 window.protocol("WM_DELETE_WINDOW", on_closing)
