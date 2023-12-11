@@ -216,8 +216,8 @@ def update_lines():
 
 
 def on_upload_audio():
-    # Access the global variables that will be modified in this function
     global selected_file_path, audio_length, paused_position, is_playing, play_obj
+    global modulated_audio_data, modulated_play_obj, modulated_is_playing, modulated_paused_position, modulated_play_bar
 
     # Open a file dialog for the user to select an audio file
     file_path = filedialog.askopenfilename(title="Upload Audio File", filetypes=[("Audio Files", "*.mp3;*.wav")])
@@ -257,6 +257,19 @@ def on_upload_audio():
         raw_play_bar.grid()  
         raw_play_button.grid()
         raw_pause_continue_button.grid()
+
+        # Hide and reset all modulated elements
+        modulated_play_bar.set(0)
+        modulated_play_bar.grid_remove()
+        modulated_play_button.grid_remove()
+        modulated_pause_continue_button.grid_remove()
+        download_modulated_button.grid_remove()
+
+        # Reset modulated audio related variables
+        modulated_audio_data = None
+        modulated_play_obj = None
+        modulated_is_playing = False
+        modulated_paused_position = 0
 
 
 def on_upload_effects():
@@ -311,16 +324,31 @@ def on_convert():
 def play_modulated_audio():
     global modulated_audio_data, modulated_play_obj, modulated_is_playing, modulated_paused_position, modulated_update_bar_thread_running, CHANNELS, WIDTH, RATE
 
-    # Stop any existing playback (if any)
+    # Stop any existing playback and updating thread
     if modulated_play_obj:
         modulated_play_obj.stop()
+
+    if modulated_update_bar_thread_running:
+        modulated_update_bar_thread_running = False
+        time.sleep(0.1)  # Allow time for the thread to stop
 
     # Reset the modulated play bar and paused position
     modulated_play_bar.set(0)
     modulated_paused_position = 0
 
-    # Start playing the modulated audio
-    modulated_play_obj = sa.play_buffer(modulated_audio_data, num_channels=CHANNELS, bytes_per_sample=WIDTH, sample_rate=RATE)
+    # Ensure the modulated audio data is not None
+    if modulated_audio_data is None:
+        print("No modulated audio data to play.")
+        return
+
+    # Start playing the modulated audio from the beginning
+    modulated_audio_segment = AudioSegment(
+        data=modulated_audio_data,
+        sample_width=WIDTH,
+        frame_rate=RATE,
+        channels=CHANNELS
+    )
+    modulated_play_obj = sa.play_buffer(modulated_audio_segment.raw_data, num_channels=CHANNELS, bytes_per_sample=WIDTH, sample_rate=RATE)
     modulated_is_playing = True
     modulated_update_bar_thread_running = True
     threading.Thread(target=update_modulated_play_bar, daemon=True).start()
@@ -328,20 +356,18 @@ def play_modulated_audio():
     # Update the toggle button to show "Pause" and enable it
     modulated_pause_continue_button.config(text="Pause", state=tk.NORMAL)
 
-
-
 def update_modulated_play_bar():
     global modulated_is_playing, modulated_play_obj, modulated_audio_length, modulated_paused_position, modulated_update_bar_thread_running
 
-    # Record the start time for calculating the current position
     start_time = time.time()
 
-    while modulated_is_playing and modulated_play_obj.is_playing() and modulated_update_bar_thread_running:
-        # Calculate the current position in the audio file
-        current_pos = (time.time() - start_time) + modulated_paused_position / 1000  # in seconds
-        modulated_play_bar.set(current_pos)
-        if current_pos >= modulated_audio_length:
-            break
+    while modulated_update_bar_thread_running:
+        if modulated_is_playing and modulated_play_obj.is_playing():
+            # Calculate the current position in the audio file
+            current_pos = (time.time() - start_time) + modulated_paused_position / 1000  # in seconds
+            modulated_play_bar.set(current_pos)
+            if current_pos >= modulated_audio_length:
+                break
         time.sleep(0.1)
 
 def toggle_modulated_pause_continue():
