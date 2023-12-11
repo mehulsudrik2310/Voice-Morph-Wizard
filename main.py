@@ -301,6 +301,7 @@ def on_convert():
         modulated_play_button.grid()
         modulated_pause_continue_button.config(state=tk.DISABLED)
         modulated_pause_continue_button.grid()
+        download_modulated_button.grid()
 
         # modulated_is_playing = True
         # modulated_paused_position = 0
@@ -375,6 +376,33 @@ def toggle_modulated_pause_continue():
         # Update the toggle button to show "Pause"
         modulated_pause_continue_button.config(text="Pause")
 
+def download_modulated_audio():
+    global modulated_audio_data, selected_file_path, CHANNELS, WIDTH, RATE
+
+    if modulated_audio_data is None:
+        print("No modulated audio to save.")
+        return
+
+    # Extracting original filename without extension
+    original_filename = os.path.splitext(os.path.basename(selected_file_path))[0]
+    default_filename = f"modulated_{original_filename}.wav"
+
+    # Open a save file dialog
+    file_path = filedialog.asksaveasfilename(
+        defaultextension=".wav",
+        filetypes=[("WAV files", "*.wav")],
+        initialfile=default_filename
+    )
+
+    if not file_path:  # If the user cancels the save operation
+        return
+
+    # Write the modulated audio data to the file
+    with wave.open(file_path, 'wb') as wf:
+        wf.setnchannels(CHANNELS)
+        wf.setsampwidth(WIDTH)
+        wf.setframerate(RATE)
+        wf.writeframes(modulated_audio_data)
 
 
 def on_closing():
@@ -490,6 +518,11 @@ modulated_play_button.grid_remove()  # Hide the modulated play button initially
 modulated_pause_continue_button = tk.Button(window, text="Pause", command=toggle_modulated_pause_continue, state=tk.DISABLED)
 modulated_pause_continue_button.grid(row=7, column=1, padx=10, pady=5, sticky='nsew')
 modulated_pause_continue_button.grid_remove()  # Hide the modulated pause/continue button initially
+
+# Create a download button for modulated audio
+download_modulated_button = tk.Button(window, text="Download", command=download_modulated_audio, state=tk.NORMAL)
+download_modulated_button.grid(row=7, column=2, padx=10, pady=5, sticky='nsew')
+download_modulated_button.grid_remove() # Hide the modulated button initially
 
 # Bind the closing function to the window close event
 window.protocol("WM_DELETE_WINDOW", on_closing)
