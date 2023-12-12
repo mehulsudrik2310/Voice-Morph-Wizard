@@ -41,6 +41,10 @@ RATE = 16000
 WIDTH = 0
 LENGTH = 0
 ca_om = 2 * math.pi * f0 / RATE
+current_play_obj = None
+audio_thread = None
+current_active_button = None
+is_audio_playing = False
 
 # Function to set the minimum size of the window to its current size
 def set_min_size():
@@ -49,7 +53,7 @@ def set_min_size():
     set_minimum_height = window.winfo_height()
     window.minsize(set_minimum_width, set_minimum_height)
 
-def play_audio():
+def raw_play_audio():
     # Access global variables that will be modified in this function
     global selected_file_path, play_obj, is_playing, paused_position, update_bar_thread_running
 
@@ -548,6 +552,82 @@ def my_modulation2(input):
 def show_select_audio_dialog():
     tk.messagebox.showinfo("Select Audio Button", "Please select an audio button before converting.")
 
+def open_audio_clips_window():
+    clips_window = tk.Toplevel(window)
+    clips_window.title("Audio Clips")
+
+    # Fetch audio files
+    audio_files = fetch_audio_files()
+
+    # Configure the grid
+    rows = (len(audio_files) + 2) // 3
+    for i in range(rows):
+        clips_window.rowconfigure(i, weight=1)
+        clips_window.columnconfigure(i, weight=1)
+
+    # Define button style
+    button_color = default_button_color  # Use the same color variable as your other buttons
+    button_padx = 35  # Horizontal padding
+    button_pady = 15  # Vertical padding
+    button_font = ("Helvetica", 10, "bold")  # Font style
+
+    # Create buttons dynamically based on audio files
+    for i, (file_name, file_path) in enumerate(audio_files.items()):
+        label = os.path.splitext(file_name)[0]
+        btn = tk.Button(clips_window, text=label, background=default_button_color, font=button_font)
+        btn.config(command=lambda path=file_path, button=btn: play_audio(path, button))
+        btn.grid(row=i//3, column=i%3, sticky='nsew', padx=button_padx, pady=button_pady)
+
+
+
+def fetch_audio_files():
+    directory = os.path.join(os.path.dirname(__file__), 'audio_clips')
+    audio_files = {}
+    for file in os.listdir(directory):
+        if file.endswith('.mp3') or file.endswith('.wav'):
+            path = os.path.join(directory, file)
+            audio_files[file] = path
+    return audio_files
+
+
+def play_audio(file_path, button):
+    global current_play_obj, audio_thread, current_active_button, is_audio_playing
+
+    def audio_worker():
+        global current_play_obj, is_audio_playing
+        try:
+            # Change the button color to green while playing
+            button.config(background="#2ECC71")
+            wave_obj = sa.WaveObject.from_wave_file(file_path)
+            current_play_obj = wave_obj.play()
+            is_audio_playing = True
+
+            while current_play_obj.is_playing():
+                time.sleep(0.1)
+
+            # Audio finished playing
+            is_audio_playing = False
+            button.config(background=default_button_color)
+        except Exception as e:
+            print(f"Error playing file {file_path}: {e}")
+            is_audio_playing = False
+            button.config(background=default_button_color)
+
+    # Stop the currently playing audio if there is one
+    if is_audio_playing:
+        current_play_obj.stop()
+        is_audio_playing = False
+        if current_active_button and current_active_button != button:
+            current_active_button.config(background=default_button_color)
+
+    # Start a new thread for the new audio if not already playing the same audio
+    if not is_audio_playing or current_active_button != button:
+        current_active_button = button
+        audio_thread = threading.Thread(target=audio_worker)
+        audio_thread.start()
+
+
+
 
 
 # Create the main window
@@ -597,6 +677,11 @@ menu_bar.add_cascade(label="File", menu=file_menu)
 file_menu.add_command(label="Upload Audio", command=on_upload_audio)
 file_menu.add_command(label="Upload Effects", command=on_upload_effects)
 
+# Create an "Audio Clips" menu item
+# audio_clips_menu_item = tk.Menu(menu_bar, tearoff=0)
+# Add "Audio Clips" directly to the menu bar
+menu_bar.add_command(label="Audio Clips", command=open_audio_clips_window)
+
 # Create a label to display the selected file name
 selected_file_label = tk.Label(window, text="Selected File: None", font=("Helvetica", 10))
 selected_file_label.grid(row=3, column=0, columnspan=2, pady=5, sticky='nsew')
@@ -615,7 +700,7 @@ raw_play_bar.grid_remove()  # Hide the play bar initially
 # play_bar.bind("<B1-Motion>", on_slider_move)
 
 # Create play and toggle (pause/continue) buttons
-raw_play_button = tk.Button(window, text="Play", command=play_audio, state=tk.NORMAL)
+raw_play_button = tk.Button(window, text="Play", command=raw_play_audio, state=tk.NORMAL)
 raw_play_button.grid(row=5, column=0, padx=10, pady=5, sticky='nsew')
 raw_play_button.grid_remove()  # Hide the play bar initially
 
