@@ -12,6 +12,9 @@ import numpy as np
 from tkinter import messagebox
 stream = None
 mic_active = False
+from utils import Utils
+from ui import UI
+
 
 # Initialize PyAudio
 p = pyaudio.PyAudio()
@@ -46,12 +49,6 @@ audio_thread = None
 current_active_button = None
 is_audio_playing = False
 
-# Function to set the minimum size of the window to its current size
-def set_min_size():
-    window.update_idletasks()  # Update the window to ensure it's fully rendered
-    set_minimum_width = window.winfo_width()
-    set_minimum_height = window.winfo_height()
-    window.minsize(set_minimum_width, set_minimum_height)
 
 def raw_play_audio():
     # Access global variables that will be modified in this function
@@ -124,7 +121,7 @@ def raw_play_audio():
 
 def on_window_resize(event):
     # Update lines on window resize
-    update_lines()
+    Utils.update_lines(canvas, microphone_button, audio_buttons, output_button)
 
 def toggle_pause_continue():
     # Access global variables that will be modified in this function
@@ -179,13 +176,14 @@ def on_microphone_click():
         start_stream()
         mic_active = True
         threading.Thread(target=process_realtime_audio, daemon=True).start()
-        toggle_button_color(microphone_button)
-        toggle_button_color(output_button)
+        Utils.toggle_button_color(microphone_button, canvas, microphone_button, audio_buttons, output_button)
+        Utils.toggle_button_color(output_button, canvas, microphone_button, audio_buttons, output_button)
+
     else:
         stop_stream()
         mic_active = False
-        toggle_button_color(microphone_button)
-        toggle_button_color(output_button)
+        Utils.toggle_button_color(microphone_button, canvas, microphone_button, audio_buttons, output_button)
+        Utils.toggle_button_color(output_button, canvas, microphone_button, audio_buttons, output_button)
 
 def stop_stream():
     global stream
@@ -220,7 +218,7 @@ def on_audio_click(audio_number):
 
     # Deselect the previously selected button if it's not the output button
     if selected_audio_button and selected_audio_button != output_button:
-        toggle_button_color(selected_audio_button)
+        Utils.toggle_button_color(selected_audio_button, canvas, microphone_button, audio_buttons, output_button)
 
     # If the same button is clicked again, set selected_audio_button to None,
     # effectively deselecting it
@@ -229,7 +227,7 @@ def on_audio_click(audio_number):
     else:
         # Select the newly clicked button and update its color
         selected_audio_button = audio_buttons[audio_number]
-        toggle_button_color(selected_audio_button)
+        Utils.toggle_button_color(selected_audio_button, canvas, microphone_button, audio_buttons, output_button)
 
 def start_stream():
     global stream, MIC_RATE, MIC_CHANNELS, BLOCKLEN
@@ -240,36 +238,8 @@ def start_stream():
                     output=True,
                     frames_per_buffer=BLOCKLEN)
 
-
-
 def on_output_click():
     print("Output button clicked")
-
-def toggle_button_color(button):
-    current_color = button.cget("background")
-    original_color = button.data["original_color"]
-    if current_color == original_color:
-        button.configure(background="#2ECC71")  # Change to green when selected
-        update_lines()  # Call to update lines when a button is toggled
-    else:
-        button.configure(background=original_color)
-        update_lines()
-
-def draw_line(start_button, end_button):
-    start_x = start_button.winfo_x() + start_button.winfo_width() / 2
-    start_y = start_button.winfo_y() + start_button.winfo_height() / 2
-    end_x = end_button.winfo_x() + end_button.winfo_width() / 2
-    end_y = end_button.winfo_y() + end_button.winfo_height() / 2
-    canvas.create_line(start_x, start_y, end_x, end_y, fill="red", width=2)  # Adjust color and width as needed
-
-def update_lines():
-    canvas.delete("all")  # Clear existing lines
-    if microphone_button.cget("background") == "#2ECC71":  # Check if microphone is 'on'
-        for audio_button in audio_buttons:
-            if audio_button.cget("background") == "#2ECC71":  # Check if any audio button is 'on'
-                draw_line(microphone_button, audio_button)
-                draw_line(audio_button, output_button)
-
 
 def on_upload_audio():
     global selected_file_path, audio_length, paused_position, is_playing, play_obj
@@ -291,7 +261,7 @@ def on_upload_audio():
 
         # Update the UI with the selected file's name and enable the Convert button
         print(f"Selected file: {file_path}")
-        shortened_file_name = shorten_file_name(file_path, max_chars=15)
+        shortened_file_name = Utils.shorten_file_name(file_path, max_chars=15)
         selected_file_label.config(text=f"Selected File: {shortened_file_name}")
         convert_button.config(state=tk.NORMAL)  # Enable the Convert button
 
@@ -359,7 +329,7 @@ def on_convert():
         elif selected_audio_button == audio_buttons[2]:
             modulated_array = my_modulation2(input_array)
         else:
-            show_select_audio_dialog()
+            Utils.show_select_audio_dialog()
             return
 
         # Convert the modulated array back to bytes
@@ -502,13 +472,6 @@ def on_closing():
     update_bar_thread_running = False
     print("Window closed")
     window.destroy()
-
-def shorten_file_name(file_path, max_chars):
-    file_name = os.path.basename(file_path)
-    if len(file_name) <= max_chars:
-        return file_name
-    else:
-        return file_name[:max_chars - 3] + "..."
     
 def my_modulation(input):
     global theta
@@ -549,8 +512,6 @@ def my_modulation2(input):
         theta = theta - 2*math.pi*math.pi*math.pi*math.pi
     return y
 
-def show_select_audio_dialog():
-    tk.messagebox.showinfo("Select Audio Button", "Please select an audio button before converting.")
 
 def open_audio_clips_window():
     clips_window = tk.Toplevel(window)
@@ -737,7 +698,7 @@ window.bind("<Configure>", on_window_resize)
 window.resizable(True, True)
 
 # After all widgets are added, call the function to set the minimum size
-set_min_size()
-
+# set_min_size()# When setting up the window
+Utils.set_min_size(window)
 # Start the Tkinter event loop
 window.mainloop()
