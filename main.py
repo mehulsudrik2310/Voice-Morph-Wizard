@@ -10,6 +10,11 @@ import threading
 import time
 import numpy as np
 from tkinter import messagebox
+stream = None
+mic_active = False
+
+# Initialize PyAudio
+p = pyaudio.PyAudio()
 
 # Initialize global variables
 selected_file_path = None
@@ -21,8 +26,8 @@ update_bar_thread_running = False  # New flag to control the thread
 num_audio_buttons = 3 # Number of audio buttons\# Calculate the middle row position
 middle_row = num_audio_buttons // 2
 f0 = 800
-RATE = 16000         # frames per second
-ca_om = 2 * math.pi * f0 / RATE
+MIC_RATE = 16000         # frames per second
+MIC_CHANNELS = 2
 theta = 0
 BLOCKLEN = 1024
 modulated_audio_data = None
@@ -32,9 +37,10 @@ modulated_update_bar_thread_running = False
 modulated_play_obj = None
 modulated_audio_length = 0
 CHANNELS = 0
-RATE = 0
+RATE = 16000
 WIDTH = 0
 LENGTH = 0
+ca_om = 2 * math.pi * f0 / RATE
 
 # Function to set the minimum size of the window to its current size
 def set_min_size():
@@ -164,9 +170,43 @@ def update_play_bar():
         time.sleep(0.1)
 
 def on_microphone_click():
-    print("Microphone button clicked")
-    toggle_button_color(microphone_button)
-    toggle_button_color(output_button)  # Also toggle the color of the output button
+    global mic_active, stream
+    if not mic_active:
+        start_stream()
+        mic_active = True
+        threading.Thread(target=process_realtime_audio, daemon=True).start()
+        toggle_button_color(microphone_button)
+        toggle_button_color(output_button)
+    else:
+        stop_stream()
+        mic_active = False
+        toggle_button_color(microphone_button)
+        toggle_button_color(output_button)
+
+def stop_stream():
+    global stream
+    if stream is not None:
+        stream.stop_stream()
+        stream.close()
+        stream = None
+def process_realtime_audio():
+    global mic_active, selected_audio_button
+    while mic_active:
+        input_audio = stream.read(BLOCKLEN)
+        input_array = np.frombuffer(input_audio, dtype=np.int16)
+
+        # Apply modulation based on the selected audio button
+        if selected_audio_button == audio_buttons[0]:
+            output_array = my_modulation(input_array)
+        elif selected_audio_button == audio_buttons[1]:
+            output_array = my_modulation1(input_array)
+        elif selected_audio_button == audio_buttons[2]:
+            output_array = my_modulation2(input_array)
+        else:
+            output_array = input_array  # No modulation if no button is selected
+
+        stream.write(output_array.astype(np.int16).tobytes())
+
 
 def on_audio_click(audio_number):
     print(f"Audio {audio_number} button clicked")
@@ -186,6 +226,17 @@ def on_audio_click(audio_number):
         # Select the newly clicked button and update its color
         selected_audio_button = audio_buttons[audio_number]
         toggle_button_color(selected_audio_button)
+
+def start_stream():
+    global stream, MIC_RATE, MIC_CHANNELS, BLOCKLEN
+    stream = p.open(format=pyaudio.paInt16,
+                    channels=MIC_CHANNELS,
+                    rate=MIC_RATE,
+                    input=True,
+                    output=True,
+                    frames_per_buffer=BLOCKLEN)
+
+
 
 def on_output_click():
     print("Output button clicked")
@@ -474,7 +525,7 @@ def my_modulation1(input):
     y = np.zeros(len(input))
     for n in range(0, len(input)):
         theta = theta + ca_om
-        y[n] = int( input[n] * math.cos(theta) )
+        y[n] = 10*int( input[n] * math.cos(theta) )
         # output_block[n] = input_block[n]  # for no processing
     # keep theta betwen -pi and pi
     while theta > math.pi:
