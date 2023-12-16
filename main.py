@@ -14,7 +14,7 @@ stream = None
 mic_active = False
 from utils import Utils
 from ui import UI
-
+from filters import Filters
 
 # Initialize PyAudio
 p = pyaudio.PyAudio()
@@ -28,10 +28,8 @@ paused_position = 0  # Track the paused position
 update_bar_thread_running = False  # New flag to control the thread
 num_audio_buttons = 3 # Number of audio buttons\# Calculate the middle row position
 middle_row = num_audio_buttons // 2
-f0 = 800
 MIC_RATE = 16000         # frames per second
 MIC_CHANNELS = 2
-theta = 0
 BLOCKLEN = 1024
 modulated_audio_data = None
 modulated_is_playing = False
@@ -40,10 +38,9 @@ modulated_update_bar_thread_running = False
 modulated_play_obj = None
 modulated_audio_length = 0
 CHANNELS = 0
-RATE = 16000
+RATE = 0
 WIDTH = 0
 LENGTH = 0
-ca_om = 2 * math.pi * f0 / RATE
 current_play_obj = None
 audio_thread = None
 current_active_button = None
@@ -191,6 +188,7 @@ def stop_stream():
         stream.stop_stream()
         stream.close()
         stream = None
+        
 def process_realtime_audio():
     global mic_active, selected_audio_button
     while mic_active:
@@ -199,11 +197,11 @@ def process_realtime_audio():
 
         # Apply modulation based on the selected audio button
         if selected_audio_button == audio_buttons[0]:
-            output_array = my_modulation(input_array)
+            output_array = Filters.my_modulation(input_array)
         elif selected_audio_button == audio_buttons[1]:
-            output_array = my_modulation1(input_array)
+            output_array = Filters.my_modulation1(input_array)
         elif selected_audio_button == audio_buttons[2]:
-            output_array = my_modulation2(input_array)
+            output_array = Filters.my_modulation2(input_array)
         else:
             output_array = input_array  # No modulation if no button is selected
 
@@ -323,11 +321,11 @@ def on_convert():
 
         # Apply modulation based on selected audio button
         if selected_audio_button == audio_buttons[0]:
-            modulated_array = my_modulation(input_array)
+            modulated_array = Filters.my_modulation(input_array)
         elif selected_audio_button == audio_buttons[1]:
-            modulated_array = my_modulation1(input_array)
+            modulated_array = Filters.my_modulation1(input_array)
         elif selected_audio_button == audio_buttons[2]:
-            modulated_array = my_modulation2(input_array)
+            modulated_array = Filters.my_modulation2(input_array)
         else:
             Utils.show_select_audio_dialog()
             return
@@ -473,46 +471,6 @@ def on_closing():
     print("Window closed")
     window.destroy()
     
-def my_modulation(input):
-    global theta
-    print("In modulation")
-    y = np.zeros(len(input))
-    for n in range(0, len(input)):
-        theta = theta + ca_om
-        y[n] = int( input[n] * math.cos(theta) )
-        # output_block[n] = input_block[n]  # for no processing
-    # keep theta betwen -pi and pi
-    while theta > math.pi:
-        theta = theta - 2*math.pi
-    return y
-
-def my_modulation1(input):
-    global theta
-    print("In modulation 1")
-    y = np.zeros(len(input))
-    for n in range(0, len(input)):
-        theta = theta + ca_om
-        y[n] = 10*int( input[n] * math.cos(theta) )
-        # output_block[n] = input_block[n]  # for no processing
-    # keep theta betwen -pi and pi
-    while theta > math.pi:
-        theta = theta - 2*math.pi*math.pi
-    return y
-
-def my_modulation2(input):
-    global theta
-    print("In modulation 2")
-    y = np.zeros(len(input))
-    for n in range(0, len(input)):
-        theta = theta + ca_om
-        y[n] = int( input[n] * math.cos(theta) )
-        # output_block[n] = input_block[n]  # for no processing
-    # keep theta betwen -pi and pi
-    while theta > math.pi:
-        theta = theta - 2*math.pi*math.pi*math.pi*math.pi
-    return y
-
-
 def open_audio_clips_window():
     clips_window = tk.Toplevel(window)
     clips_window.title("Audio Clips")
