@@ -16,6 +16,7 @@ from utils import Utils
 from ui import UI
 from filters import Filters
 
+
 # Initialize PyAudio
 p = pyaudio.PyAudio()
 
@@ -26,8 +27,7 @@ audio_length = 0
 is_playing = False
 paused_position = 0  # Track the paused position
 update_bar_thread_running = False  # New flag to control the thread
-num_audio_buttons = 3 # Number of audio buttons\# Calculate the middle row position
-middle_row = num_audio_buttons // 2
+num_audio_buttons = 1 # Number of audio buttons\# Calculate the middle row position
 MIC_RATE = 16000         # frames per second
 MIC_CHANNELS = 2
 BLOCKLEN = 1024
@@ -45,9 +45,13 @@ current_play_obj = None
 audio_thread = None
 current_active_button = None
 is_audio_playing = False
+current_filter  = ""
+filter_options = ["Normal", "Alien Voice", "Robotic Voice", "Male Voice", "Female Voice", "Echoed Voice", "Ping Pong Voice", "Alternate Channel Effect"]
+button_off_color = "#3498DB"
+button_on_color = "#2ECC71"
 
 
-def raw_play_audio():
+def play_raw_audio():
     # Access global variables that will be modified in this function
     global selected_file_path, play_obj, is_playing, paused_position, update_bar_thread_running
 
@@ -80,45 +84,9 @@ def raw_play_audio():
         # Update the state of toggle button to show "Pause" and enable it
         raw_pause_continue_button.config(text="Pause", state=tk.NORMAL)
 
-# def on_slider_move(event):
-#     # Access global variables that will be modified in this function
-#     global play_obj, is_playing, paused_position, update_bar_thread_running
-
-#     if is_playing:
-#         # Stop any currently playing audio
-#         if play_obj:
-#             play_obj.stop()
-
-#         # Calculate the new playback position from the slider
-#         paused_position = int(play_bar.get() * 1000)  # Convert to milliseconds
-
-#         # Load the audio file and prepare it for playback from the new position
-#         audio = AudioSegment.from_file(selected_file_path)
-#         audio = audio[paused_position:]  # Start playing from this position
-#         play_obj = sa.play_buffer(audio.raw_data, num_channels=audio.channels, bytes_per_sample=audio.sample_width, sample_rate=audio.frame_rate)
-
-#         # Start a new thread to update the play bar, if not already running
-#         if not update_bar_thread_running:
-#             update_bar_thread_running = True
-#             threading.Thread(target=update_play_bar, daemon=True).start()
-
-# def on_slider_click(event):
-#     # Access global variable
-#     global paused_position
-
-#     # Calculate the relative position (0.0 to 1.0) of the click on the slider track
-#     relative_position = event.x / play_bar.winfo_width()
-
-#     # Calculate the new value for the slider based on its range and the relative position
-#     new_value = relative_position * audio_length
-#     play_bar.set(new_value)
-
-#     # Update paused_position to the new value in milliseconds
-#     paused_position = int(new_value * 1000)
-
 def on_window_resize(event):
     # Update lines on window resize
-    Utils.update_lines(canvas, microphone_button, audio_buttons, output_button)
+    Utils.update_lines(canvas, microphone_button, filter_button, output_button)
 
 def toggle_pause_continue():
     # Access global variables that will be modified in this function
@@ -169,63 +137,72 @@ def update_play_bar():
 
 def on_microphone_click():
     global mic_active, stream
+    print(microphone_button.data["is_on"])
     if not mic_active:
         start_stream()
         mic_active = True
         threading.Thread(target=process_realtime_audio, daemon=True).start()
-        Utils.toggle_button_color(microphone_button, canvas, microphone_button, audio_buttons, output_button)
-        Utils.toggle_button_color(output_button, canvas, microphone_button, audio_buttons, output_button)
+        Utils.toggle_button_color(microphone_button, canvas, microphone_button, filter_button, output_button)
+        Utils.toggle_button_color(output_button, canvas, microphone_button, filter_button, output_button)
 
     else:
         stop_stream()
         mic_active = False
-        Utils.toggle_button_color(microphone_button, canvas, microphone_button, audio_buttons, output_button)
-        Utils.toggle_button_color(output_button, canvas, microphone_button, audio_buttons, output_button)
+        Utils.toggle_button_color(microphone_button, canvas, microphone_button, filter_button, output_button)
+        Utils.toggle_button_color(output_button, canvas, microphone_button, filter_button, output_button)
+    print(microphone_button.data["is_on"])
 
 def stop_stream():
     global stream
     if stream is not None:
         stream.stop_stream()
-        stream.close()
-        stream = None
+        #stream.close()
+        #stream = None
         
 def process_realtime_audio():
-    global mic_active, selected_audio_button
+    global mic_active, current_filter
     while mic_active:
         input_audio = stream.read(BLOCKLEN)
         input_array = np.frombuffer(input_audio, dtype=np.int16)
+        output_array = np.empty(1)
 
-        # Apply modulation based on the selected audio button
-        if selected_audio_button == audio_buttons[0]:
-            output_array = Filters.my_modulation(input_array)
-        elif selected_audio_button == audio_buttons[1]:
-            output_array = Filters.my_modulation1(input_array)
-        elif selected_audio_button == audio_buttons[2]:
-            output_array = Filters.my_modulation2(input_array)
+        if filter_button.data["is_on"] == True:
+            # Apply modulation based on the selected audio button
+            if current_filter == "Alien Voice":
+                print("Alien")
+                output_array = Filters.alien_effect(input_array)
+            elif current_filter == "Robotic Voice":
+                print("Robot")
+                output_array = Filters.robotize_effect(input_array)
+            elif current_filter == "Male Voice":
+                print("Male")
+                output_array = Filters.male_effect(input_array)
+            elif current_filter == "Female Voice":
+                print("Female")
+                output_array = Filters.female_effect(input_array)
+            elif current_filter == "Echoed Voice":
+                print("Echoed")
+                output_array = Filters.echo_effect(input_array)
+            elif current_filter == "Ping Pong Voice":
+                print("Ping Pong")
+                output_array = Filters.ping_pong_effect(input_array)
+            elif current_filter == "Alternate Channel Effect":
+                #print("Alternate Channel Effect")
+                output_array = Filters.alternate_channels(input_array)
         else:
             output_array = input_array  # No modulation if no button is selected
-
         stream.write(output_array.astype(np.int16).tobytes())
 
 
-def on_audio_click(audio_number):
-    print(f"Audio {audio_number} button clicked")
-
+def on_filter_click():
+    print(f"Filter button clicked")
     # Access the global variable that tracks the currently selected audio button
-    global selected_audio_button
+    if current_filter!= "Normal":
+        if filter_button.data["is_on"] == False:
+            Utils.toggle_button_color(filter_button, canvas, microphone_button, filter_button, output_button)
+        elif filter_button.data["is_on"] == True:
+            Utils.toggle_button_color(filter_button, canvas, microphone_button, filter_button, output_button)
 
-    # Deselect the previously selected button if it's not the output button
-    if selected_audio_button and selected_audio_button != output_button:
-        Utils.toggle_button_color(selected_audio_button, canvas, microphone_button, audio_buttons, output_button)
-
-    # If the same button is clicked again, set selected_audio_button to None,
-    # effectively deselecting it
-    if selected_audio_button == audio_buttons[audio_number]:
-        selected_audio_button = None
-    else:
-        # Select the newly clicked button and update its color
-        selected_audio_button = audio_buttons[audio_number]
-        Utils.toggle_button_color(selected_audio_button, canvas, microphone_button, audio_buttons, output_button)
 
 def start_stream():
     global stream, MIC_RATE, MIC_CHANNELS, BLOCKLEN
@@ -302,7 +279,7 @@ def on_upload_effects():
         print(f"Effects file uploaded: {effects_path}")
 
 def on_convert():
-    global selected_file_path, modulated_audio_data, modulated_audio_length, modulated_play_button, modulated_pause_continue_button, modulated_play_bar, modulated_is_playing, modulated_paused_position, modulated_update_bar_thread_running, modulated_play_obj, CHANNELS, RATE, WIDTH, LENGTH
+    global selected_file_path, modulated_audio_data, modulated_audio_length, modulated_play_button, modulated_pause_continue_button, modulated_play_bar, modulated_is_playing, modulated_paused_position, modulated_update_bar_thread_running, modulated_play_obj, current_filter, CHANNELS, RATE, WIDTH, LENGTH
 
     if selected_file_path:
         print(f"Converting {selected_file_path}...")
@@ -319,13 +296,29 @@ def on_convert():
         # Convert the bytes to numpy array
         input_array = np.frombuffer(input_bytes, dtype='int16')
 
-        # Apply modulation based on selected audio button
-        if selected_audio_button == audio_buttons[0]:
-            modulated_array = Filters.my_modulation(input_array)
-        elif selected_audio_button == audio_buttons[1]:
-            modulated_array = Filters.my_modulation1(input_array)
-        elif selected_audio_button == audio_buttons[2]:
-            modulated_array = Filters.my_modulation2(input_array)
+        if filter_button.data["is_on"] == True:
+            # Apply modulation based on selected audio button
+            if current_filter == "Alien Voice":
+                print("Alien")
+                modulated_array = Filters.alien_effect(input_array)
+            elif current_filter == "Robotic Voice":
+                print("Robot")
+                modulated_array = Filters.robotize_effect(input_array)
+            elif current_filter == "Male Voice":
+                print("Male")
+                modulated_array = Filters.male_effect(input_array)
+            elif current_filter == "Female Voice":
+                print("Female")
+                modulated_array = Filters.female_effect(input_array)
+            elif current_filter == "Echoed Voice":
+                print("Echoed")
+                modulated_array = Filters.echo_effect(input_array)
+            elif current_filter == "Ping Pong Voice":
+                print("Ping Pong")
+                modulated_array = Filters.ping_pong_effect(input_array)
+            elif current_filter == "Alternate Channel Effect":
+                print("Alternate Channel Effect")
+                modulated_array = Filters.alternate_channels(input_array)
         else:
             Utils.show_select_audio_dialog()
             return
@@ -378,9 +371,9 @@ def play_modulated_audio():
         data=modulated_audio_data,
         sample_width=WIDTH,
         frame_rate=RATE,
-        channels=CHANNELS
+        channels=2
     )
-    modulated_play_obj = sa.play_buffer(modulated_audio_segment.raw_data, num_channels=CHANNELS, bytes_per_sample=WIDTH, sample_rate=RATE)
+    modulated_play_obj = sa.play_buffer(modulated_audio_segment.raw_data, num_channels=2, bytes_per_sample=WIDTH, sample_rate=RATE)
     modulated_is_playing = True
     modulated_update_bar_thread_running = True
     threading.Thread(target=update_modulated_play_bar, daemon=True).start()
@@ -485,7 +478,6 @@ def open_audio_clips_window():
         clips_window.columnconfigure(i, weight=1)
 
     # Define button style
-    button_color = default_button_color  # Use the same color variable as your other buttons
     button_padx = 35  # Horizontal padding
     button_pady = 15  # Vertical padding
     button_font = ("Helvetica", 10, "bold")  # Font style
@@ -493,7 +485,7 @@ def open_audio_clips_window():
     # Create buttons dynamically based on audio files
     for i, (file_name, file_path) in enumerate(audio_files.items()):
         label = os.path.splitext(file_name)[0]
-        btn = tk.Button(clips_window, text=label, background=default_button_color, font=button_font)
+        btn = tk.Button(clips_window, text=label, background=button_off_color, font=button_font)
         btn.config(command=lambda path=file_path, button=btn: play_audio(path, button))
         btn.grid(row=i//3, column=i%3, sticky='nsew', padx=button_padx, pady=button_pady)
 
@@ -526,18 +518,18 @@ def play_audio(file_path, button):
 
             # Audio finished playing
             is_audio_playing = False
-            button.config(background=default_button_color)
+            button.config(background=button_off_color)
         except Exception as e:
             print(f"Error playing file {file_path}: {e}")
             is_audio_playing = False
-            button.config(background=default_button_color)
+            button.config(background=button_on_color)
 
     # Stop the currently playing audio if there is one
     if is_audio_playing:
         current_play_obj.stop()
         is_audio_playing = False
         if current_active_button and current_active_button != button:
-            current_active_button.config(background=default_button_color)
+            current_active_button.config(background=button_off_color)
 
     # Start a new thread for the new audio if not already playing the same audio
     if not is_audio_playing or current_active_button != button:
@@ -545,8 +537,14 @@ def play_audio(file_path, button):
         audio_thread = threading.Thread(target=audio_worker)
         audio_thread.start()
 
-
-
+def on_filter_option_change(event):
+    global current_filter
+    selected_option = filter_option_combobox.get()
+    current_filter = selected_option
+    filter_button.config(text=selected_option)
+    if current_filter == "Normal":
+        filter_button.data["is_on"] = True
+        Utils.toggle_button_color(filter_button, canvas, microphone_button, filter_button, output_button)
 
 
 # Create the main window
@@ -559,32 +557,40 @@ for i in range(6):  # Adjust the range based on your number of rows
 for j in range(3):  # Adjust the range based on your number of columns
     window.columnconfigure(j, weight=1)
 
-# Set the original button color
-default_button_color = "#3498DB"
-selected_button_color = "#2ECC71"
 
 # Create the canvas and place it below the buttons
 canvas = tk.Canvas(window, height=200, width=300)  # Adjust size as needed
 canvas.grid(row=0, column=0, rowspan=6, columnspan=3, sticky='nsew')
 
 # Create and place the Microphone button in the middle of the audio button stack
-microphone_button = tk.Button(window, text="Microphone", command=on_microphone_click, background=default_button_color, font=("Helvetica", 10, "bold"), width=13, height=1)
-microphone_button.grid(row=middle_row, column=0, padx=10, pady=10, sticky='nsew')
-microphone_button.data = {"original_color": default_button_color}
+microphone_button = tk.Button(window, text="Microphone", command=on_microphone_click, background=button_off_color, font=("Helvetica", 10, "bold"), width=13, height=1)
+microphone_button.grid(row=0, column=0, padx=10, pady=10, sticky='nsew')
+microphone_button.data = {"is_on": False}
 
 # Create and place the Audio buttons
-audio_buttons = []
-selected_audio_button = None
-for i in range(num_audio_buttons):
-    audio_button = tk.Button(window, text=f"Audio {i}", command=lambda i=i: on_audio_click(i), background=default_button_color, font=("Helvetica", 10, "bold"))
-    audio_button.grid(row=i, column=1, padx=35, pady=15, sticky='nsew')
-    audio_button.data = {"original_color": default_button_color}
-    audio_buttons.append(audio_button)
+# audio_buttons = []
+# selected_audio_button = None
+# for i in range(num_audio_buttons):
+#     audio_button = tk.Button(window, text=f"Audio {i}", command=lambda i=i: on_audio_click(i), background=default_button_color, font=("Helvetica", 10, "bold"))
+#     audio_button.grid(row=i, column=1, padx=35, pady=15, sticky='nsew')
+#     audio_button.data = {"original_color": default_button_color}
+#     audio_buttons.append(audio_button)
+
+# Create and place the Filter button
+filter_button = tk.Button(window, text="Normal", command=on_filter_click, background=button_off_color, font=("Helvetica", 10, "bold"), width=13, height=1)
+filter_button.grid(row=0, column=1, padx=10, pady=10, sticky='nsew')
+filter_button.data = {"is_on": False}
 
 # Create and place the Output button in the middle of the audio button stack
-output_button = tk.Button(window, text="Output", command=on_output_click, background=default_button_color, font=("Helvetica", 10, "bold"), width=10, height=1)
-output_button.grid(row=middle_row, column=2, padx=10, pady=10, sticky='nsew')
-output_button.data = {"original_color": default_button_color}
+output_button = tk.Button(window, text="Output", command=on_output_click, background=button_off_color, font=("Helvetica", 10, "bold"), width=10, height=1)
+output_button.grid(row=0, column=2, padx=10, pady=10, sticky='nsew')
+output_button.data = {"is_on": False}
+
+# Create and place the Filter Options Combobox
+filter_option_combobox = ttk.Combobox(window, values=filter_options, state="readonly")
+filter_option_combobox.grid(row=1, column=1, padx=10, pady=10, sticky='nsew')
+filter_option_combobox.set("Normal")  # Set the default value
+filter_option_combobox.bind("<<ComboboxSelected>>", on_filter_option_change)
 
 # Create a menu bar
 menu_bar = tk.Menu(window)
@@ -619,7 +625,7 @@ raw_play_bar.grid_remove()  # Hide the play bar initially
 # play_bar.bind("<B1-Motion>", on_slider_move)
 
 # Create play and toggle (pause/continue) buttons
-raw_play_button = tk.Button(window, text="Play", command=raw_play_audio, state=tk.NORMAL)
+raw_play_button = tk.Button(window, text="Play", command=play_raw_audio, state=tk.NORMAL)
 raw_play_button.grid(row=5, column=0, padx=10, pady=5, sticky='nsew')
 raw_play_button.grid_remove()  # Hide the play bar initially
 

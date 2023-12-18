@@ -4,6 +4,9 @@ from tkinter import messagebox
 from typing import List
 from ui import UI
 
+button_off_color = "#3498DB"
+button_on_color = "#2ECC71"
+
 class Utils:
     @staticmethod
     def set_min_size(window: tk.Tk) -> None:
@@ -53,7 +56,7 @@ class Utils:
             return file_name[:max_chars - 3] + "..."
 
     @staticmethod
-    def toggle_button_color(button: tk.Button, canvas: tk.Canvas, microphone_button: tk.Button, audio_buttons: List[tk.Button], output_button: tk.Button) -> None:
+    def toggle_button_color(button: tk.Button, canvas: tk.Canvas, microphone_button: tk.Button, filter_button: tk.Button, output_button: tk.Button) -> None:
         """
         Toggle the color of a button between active and inactive states.
 
@@ -71,18 +74,18 @@ class Utils:
         If the button is currently active (green), it changes the background color back to
         the original color and updates the lines on the canvas accordingly.
         """
-        current_color = button.cget("background")
-        original_color = button.data["original_color"]
-        if current_color == original_color:
-            button.configure(background="#2ECC71")  # Change to green when selected
-            Utils.update_lines(canvas, microphone_button, audio_buttons, output_button)  # Call to update lines when a button is toggled
+        if button.data["is_on"] == False:
+            button.configure(background=button_on_color)  # Change to green when selected
+            button.data["is_on"] = True
+            Utils.update_lines(canvas, microphone_button, filter_button, output_button)  # Call to update lines when a button is toggled
         else:
-            button.configure(background=original_color)
-            Utils.update_lines(canvas, microphone_button, audio_buttons, output_button)
+            button.configure(background=button_off_color)
+            Utils.update_lines(canvas, microphone_button, filter_button, output_button)
+            button.data["is_on"] = False
 
     
     @staticmethod
-    def update_lines(canvas: tk.Canvas, microphone_button: tk.Button, audio_buttons: List[tk.Button], output_button: tk.Button) -> None:
+    def update_lines(canvas: tk.Canvas, microphone_button: tk.Button, filter_button: tk.Button, output_button: tk.Button) -> None:
         """
         Update lines on a canvas connecting UI elements.
 
@@ -103,11 +106,9 @@ class Utils:
         audio button to the output button.
         """
         canvas.delete("all")  # Clear existing lines
-        if microphone_button.cget("background") == "#2ECC71":  # Check if microphone is 'on'
-            for audio_button in audio_buttons:
-                if audio_button.cget("background") == "#2ECC71":  # Check if any audio button is 'on'
-                    UI.draw_line(canvas, microphone_button, audio_button)
-                    UI.draw_line(canvas, audio_button, output_button)
+        if microphone_button.cget("background") == "#2ECC71" and filter_button.cget("background") == "#2ECC71":  # Check if microphone is 'on' 
+            UI.draw_line(canvas, microphone_button, filter_button)
+            UI.draw_line(canvas, filter_button, output_button)
 
 
     @staticmethod
