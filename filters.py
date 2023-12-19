@@ -1,7 +1,6 @@
 import math
 from scipy import signal
 import numpy as np
-import librosa
 
 RATE = 8000
 
@@ -117,7 +116,7 @@ class Filters:
         # Calculate the pitch shift factor
         pitch_shift_factor = 2 ** (pitch_shift_steps / 12.0)
         
-        # Apply pitch shift without using librosa
+        # Apply pitch shift
         pitch_shifted = np.interp(np.arange(0, len(modulated), pitch_shift_factor),
                                 np.arange(len(modulated)),
                                 modulated)
@@ -152,6 +151,33 @@ class Filters:
         return pitch_shifted.astype(np.int16)
     
     @staticmethod
+    def female_effect(input: np.ndarray, pitch_shift_steps: int = 3) -> np.ndarray:
+        """
+        Apply a pitch shift to make the input signal sound like a female voice.
+
+        This function shifts the pitch of the input signal to create a female voice effect.
+
+        Parameters:
+        - input (numpy.ndarray): Input audio signal.
+        - pitch_shift_steps (int): Number of pitch shift steps (default is 3).
+
+        Returns:
+        - numpy.ndarray: Audio signal with female voice pitch shift applied.
+        """
+        # Convert input to float for processing
+        input_float = input.astype(float)
+
+        # Calculate the pitch shift factor
+        pitch_shift_factor = 2 ** (pitch_shift_steps / 12.0)
+
+        # Apply pitch shift
+        pitch_shifted = np.interp(np.arange(0, len(input_float), pitch_shift_factor),
+                                np.arange(len(input_float)),
+                                input_float)
+
+        return pitch_shifted.astype(np.int16)
+
+    @staticmethod
     def baby_effect(input_array: np.ndarray, pitch_shift_steps: int = 10) -> np.ndarray:
         """
         Apply a baby pitch effect to the input signal.
@@ -171,7 +197,7 @@ class Filters:
         # Calculate the pitch shift factor for a baby pitch
         pitch_shift_factor = 2 ** (pitch_shift_steps / 12.0)
 
-        # Apply pitch shift without using librosa
+        # Apply pitch shift
         pitch_shifted = np.interp(np.arange(0, len(input_float), pitch_shift_factor),
                                 np.arange(len(input_float)),
                                 input_float)
