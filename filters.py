@@ -1,4 +1,5 @@
 import math
+from scipy import signal
 import numpy as np
 import librosa
 
@@ -19,7 +20,7 @@ class Filters:
             theta = theta - 2*math.pi
         return y
     
-    def echo_effect(input, delay_samples=500, decay_factor=0.6):
+    def echo_effect(input, delay_samples=512, decay_factor=1.2):
         output = np.zeros(len(input) + delay_samples, dtype=np.int16)
         input_padded = np.pad(input, (delay_samples, 0), mode='constant')
 
@@ -113,3 +114,70 @@ class Filters:
                 output[i, 1] = x
 
         return output
+    
+    # @staticmethod
+    # def autobots(input_array, rate = RATE, dly_in_sec=0.2, delay_gain=1):
+    #     bufferLen = int(rate * dly_in_sec)
+    #     buffer = bufferLen * [0]
+    #     k = 0
+    #     output = np.zeros(len(input_array))
+
+    #     for i, x_i in enumerate(input_array):
+    #         output[i] = x_i * np.cos(2 * np.pi * 0.6 * i) + delay_gain * buffer[k]
+    #         buffer[k] = output[i]
+    #         k = (k + 1) % len(buffer)
+
+    #     return output
+    
+    # @staticmethod
+    # def drunk(input_array, rate = RATE, delay_sec=0.2):
+    #     bufferLen = int(delay_sec * rate)
+    #     buffer = [0] * bufferLen
+    #     k = 0
+    #     output = np.zeros(len(input_array))
+
+    #     for i, x_i in enumerate(input_array):
+    #         y_i = x_i * np.cos(i) + x_i * np.sin(i) + buffer[k]
+    #         output[i] = y_i
+    #         buffer[k] = x_i
+    #         k = (k + 1) % bufferLen
+
+    #     return output
+    
+    # def autobots(input, sr=16000, vibrato_rate=7, vibrato_depth=70):
+    #     """
+    #     Apply a vibrato effect to the input signal.
+        
+    #     :param input: Input audio signal (numpy array).
+    #     :param sr: Sampling rate of the audio signal.
+    #     :param vibrato_rate: Rate of vibrato in Hz.
+    #     :param vibrato_depth: Depth of vibrato in samples.
+    #     :return: Vibrato applied audio signal.
+    #     """
+    #     output = np.zeros_like(input)
+    #     t = np.arange(len(input))
+    #     vibrato = vibrato_depth * np.sin(2 * np.pi * vibrato_rate * t / sr)
+    #     for i in range(len(input)):
+    #         vibrato_index = int(i + vibrato[i])
+    #         if 0 <= vibrato_index < len(input):
+    #             output[i] = input[vibrato_index]
+    #     return output.astype(np.int16)
+    
+    def autobots(input, sr=16000, delay=0.03, depth=0.02, rate=0.55):
+        """
+        Apply a flanger effect to the input signal.
+        
+        :param input: Input audio signal (numpy array).
+        :param sr: Sampling rate of the audio signal.
+        :param delay: Base delay in seconds.
+        :param depth: Modulation depth in seconds.
+        :param rate: Rate of flange modulation in Hz.
+        :return: Flanger applied audio signal.
+        """
+        output = np.zeros_like(input)
+        max_delay = int((delay + depth) * sr)
+        for i in range(max_delay, len(input)):
+            mod_delay = int(delay * sr + depth * sr * np.sin(2 * np.pi * rate * i / sr))
+            output[i] = input[i] + input[i - mod_delay]
+        return output.astype(np.int16)
+        

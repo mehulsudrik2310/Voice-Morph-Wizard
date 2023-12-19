@@ -10,8 +10,6 @@ import threading
 import time
 import numpy as np
 from tkinter import messagebox
-stream = None
-mic_active = False
 from utils import Utils
 from ui import UI
 from filters import Filters
@@ -46,9 +44,11 @@ audio_thread = None
 current_active_button = None
 is_audio_playing = False
 current_filter  = ""
-filter_options = ["Normal", "Alien Voice", "Robotic Voice", "Male Voice", "Female Voice", "Echoed Voice", "Ping Pong Voice", "Alternate Channel Effect"]
+filter_options = ["Normal", "Alien Voice", "Robotic Voice", "Male Voice", "Female Voice", "Echoed Voice", "Ping Pong Voice", "Alternate Channel Effect", "Else"]
 button_off_color = "#3498DB"
 button_on_color = "#2ECC71"
+stream = None
+mic_active = False
 
 
 def play_raw_audio():
@@ -169,26 +169,21 @@ def process_realtime_audio():
         if filter_button.data["is_on"] == True:
             # Apply modulation based on the selected audio button
             if current_filter == "Alien Voice":
-                print("Alien")
                 output_array = Filters.alien_effect(input_array)
             elif current_filter == "Robotic Voice":
-                print("Robot")
                 output_array = Filters.robotize_effect(input_array)
             elif current_filter == "Male Voice":
-                print("Male")
                 output_array = Filters.male_effect(input_array)
             elif current_filter == "Female Voice":
-                print("Female")
                 output_array = Filters.female_effect(input_array)
             elif current_filter == "Echoed Voice":
-                print("Echoed")
                 output_array = Filters.echo_effect(input_array)
             elif current_filter == "Ping Pong Voice":
-                print("Ping Pong")
                 output_array = Filters.ping_pong_effect(input_array)
             elif current_filter == "Alternate Channel Effect":
-                #print("Alternate Channel Effect")
                 output_array = Filters.alternate_channels(input_array)
+            elif current_filter == "Else":
+                output_array = Filters.autobots(input_array)
         else:
             output_array = input_array  # No modulation if no button is selected
         stream.write(output_array.astype(np.int16).tobytes())
@@ -299,26 +294,21 @@ def on_convert():
         if filter_button.data["is_on"] == True:
             # Apply modulation based on selected audio button
             if current_filter == "Alien Voice":
-                print("Alien")
                 modulated_array = Filters.alien_effect(input_array)
             elif current_filter == "Robotic Voice":
-                print("Robot")
                 modulated_array = Filters.robotize_effect(input_array)
             elif current_filter == "Male Voice":
-                print("Male")
                 modulated_array = Filters.male_effect(input_array)
             elif current_filter == "Female Voice":
-                print("Female")
                 modulated_array = Filters.female_effect(input_array)
             elif current_filter == "Echoed Voice":
-                print("Echoed")
                 modulated_array = Filters.echo_effect(input_array)
             elif current_filter == "Ping Pong Voice":
-                print("Ping Pong")
                 modulated_array = Filters.ping_pong_effect(input_array)
             elif current_filter == "Alternate Channel Effect":
-                print("Alternate Channel Effect")
                 modulated_array = Filters.alternate_channels(input_array)
+            elif current_filter == "Else":
+                modulated_array = Filters.autobots(input_array)
         else:
             Utils.show_select_audio_dialog()
             return
