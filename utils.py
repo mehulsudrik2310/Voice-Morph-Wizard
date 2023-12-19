@@ -1,11 +1,9 @@
 import os
 import tkinter as tk
 from tkinter import messagebox
-from typing import List
 from ui import UI
-
-button_off_color = "#3498DB"
-button_on_color = "#2ECC71"
+from tkinter import filedialog
+from pydub import AudioSegment
 
 class Utils:
     @staticmethod
@@ -56,64 +54,40 @@ class Utils:
             return file_name[:max_chars - 3] + "..."
 
     @staticmethod
-    def toggle_button_color(button: tk.Button, canvas: tk.Canvas, microphone_button: tk.Button, filter_button: tk.Button, output_button: tk.Button) -> None:
-        """
-        Toggle the color of a button between active and inactive states.
-
-        Parameters:
-            button (tk.Button): The Tkinter button to toggle the color of.
-            canvas (tk.Canvas): The Tkinter canvas to update lines on.
-            microphone_button (tk.Button): The microphone button.
-            audio_buttons (List[tk.Button]): A list of audio buttons.
-            output_button (tk.Button): The output button.
-
-        This function changes the background color of the button to indicate its state.
-
-        If the button is currently inactive (original color), it changes the background color
-        to green when selected and updates the lines on the canvas to reflect the new state.
-        If the button is currently active (green), it changes the background color back to
-        the original color and updates the lines on the canvas accordingly.
-        """
-        if button.data["is_on"] == False:
-            button.configure(background=button_on_color)  # Change to green when selected
-            button.data["is_on"] = True
-            Utils.update_lines(canvas, microphone_button, filter_button, output_button)  # Call to update lines when a button is toggled
-        else:
-            button.configure(background=button_off_color)
-            Utils.update_lines(canvas, microphone_button, filter_button, output_button)
-            button.data["is_on"] = False
-
-    
-    @staticmethod
-    def update_lines(canvas: tk.Canvas, microphone_button: tk.Button, filter_button: tk.Button, output_button: tk.Button) -> None:
-        """
-        Update lines on a canvas connecting UI elements.
-
-        Parameters:
-            canvas (tk.Canvas): The Tkinter canvas to update lines on.
-            microphone_button (tk.Button): The microphone button.
-            audio_buttons (List[tk.Button]): A list of audio buttons.
-            output_button (tk.Button): The output button.
-
-        Returns:
-            None
-
-        This function updates lines on the canvas to visually connect UI elements
-        based on their states and positions.
-
-        If the microphone is 'on' (green background), lines are drawn connecting
-        the microphone button to the active audio buttons and from each active
-        audio button to the output button.
-        """
-        canvas.delete("all")  # Clear existing lines
-        if microphone_button.cget("background") == "#2ECC71" and filter_button.cget("background") == "#2ECC71":  # Check if microphone is 'on' 
-            UI.draw_line(canvas, microphone_button, filter_button)
-            UI.draw_line(canvas, filter_button, output_button)
-
-
-    @staticmethod
     def show_select_audio_dialog() -> None:
         """
         Show a dialog box indicating the need to select an audio button.
         """
         messagebox.showinfo("Select Audio Button", "Please select an audio button before converting.")
+
+    @staticmethod
+    def on_filter_option_change(event, filter_option_combobox, canvas, microphone_button, filter_button, output_button, current_filter):
+        selected_option = filter_option_combobox.get()
+        current_filter = selected_option
+        filter_button.config(text=selected_option)
+        if current_filter == "Normal":
+            filter_button.data["is_on"] = True
+            UI.toggle_button_color(filter_button, canvas, microphone_button, filter_button, output_button)
+    
+
+    @staticmethod
+    def on_upload_effects() -> None:
+        """
+        Open a file dialog to upload an effects file.
+
+        Returns:
+            None
+
+        This method opens a file dialog to allow the user to upload an effects file.
+        If a file is selected, the file path is printed to the console.
+
+        Example usage:
+            YourClass.on_upload_effects()
+        """
+        # Open a file dialog to select an effects file
+        effects_path = filedialog.askopenfilename(title="Upload Effects File", filetypes=[("Audio Files", "*.mp3;*.wav")])
+
+        # Check if a file was selected
+        if effects_path:
+            # Print the path of the uploaded effects file to the console
+            print(f"Effects file uploaded: {effects_path}")
