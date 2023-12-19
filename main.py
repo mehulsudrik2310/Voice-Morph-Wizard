@@ -1054,7 +1054,7 @@ def on_filter_option_change(event: tk.Event) -> None:
 
 # Create the main window
 window = tk.Tk()
-window.title("Voice Changer")
+window.title("Voice Morph Wizard")
 
 # Configure the grid rows and columns to expand proportionally
 for i in range(6):  # Adjust the range based on your number of rows
