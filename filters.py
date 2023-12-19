@@ -3,68 +3,98 @@ from scipy import signal
 import numpy as np
 import librosa
 
-f0 = 100
-RATE = 16000
-theta = 0
-ca_om = 2 * math.pi * f0 / RATE
-ping_pong_buffer = np.zeros(RATE)
-ping_pong_pointer = 0
+RATE = 8000
+
+# Global variables for various effects
+global_theta = 0  # For alien effect
+global_echo_buffer = np.zeros(1024)  # For echo effect
+global_echo_pointer = 0
+global_vibrato_buffer = np.zeros(1024)  # For mutation (vibrato) effect
+global_vibrato_pointers = [0, 512]  # [read_pointer, write_pointer]
+global_flanger_buffer = np.zeros(int(0.03 * RATE) + 1)  # For flanger effect
+global_flanger_pointer = 0
+global_ping_pong_buffer = np.zeros(RATE)  # For ping-pong effect
+global_ping_pong_pointer = 0
+
 
 class Filters:
     @staticmethod
-    def alien_effect(input: np.ndarray) -> np.ndarray:
+    def alien_effect(input_array: np.ndarray) -> np.ndarray:
         """
         Apply an alien voice modulation effect to the input signal.
 
+        This function modulates the input audio signal with an alien voice effect.
+        It uses a cosine modulation with a frequency of 700 Hz to create the modulation effect.
+
         Parameters:
-        - input (numpy.ndarray): Input audio signal.
+        - input_array (numpy.ndarray): Input audio signal.
 
         Returns:
         - numpy.ndarray: Alien voice modulated audio signal.
         """
-        global theta, ca_om
-        y = np.zeros(len(input))  # Initialize an array for the modulated signal
-        for n in range(0, len(input)):
-            theta = theta + ca_om  # Increment the phase by the modulation frequency
-            y[n] = int(input[n] * math.cos(theta))  # Apply modulation to the input signal
-        # Keep theta between -pi and pi
-        while theta > math.pi:
-            theta = theta - 2*math.pi
-        return y
+        global global_theta
+        modulation_frequency = 700
+        modulation_angular_frequency = 2 * math.pi * modulation_frequency / (RATE * 2)
+        
+        modulated_signal = np.zeros(len(input_array))  # Initialize an array for the modulated signal
 
-    
+        for n in range(len(input_array)):
+            global_theta += modulation_angular_frequency  # Increment the phase by the modulation frequency
+            modulated_signal[n] = int(input_array[n] * math.cos(global_theta))  # Apply modulation to the input signal
+            
+            # Keep global_theta between -pi and pi
+            while global_theta > math.pi:
+                global_theta -= 2 * math.pi
+
+        return modulated_signal
+
     @staticmethod
-    def echo_effect(input: np.ndarray, delay_samples: int = 512, decay_factor: float = 1.2) -> np.ndarray:
+    def echo_effect(input_array: np.ndarray, delay_samples: int = 1024, decay_factor: float = 0.7) -> np.ndarray:
         """
         Apply an echo effect to the input signal.
 
+        This function applies an echo effect to the input audio signal, creating a delayed repetition.
+
         Parameters:
-        - input (numpy.ndarray): Input audio signal.
-        - delay_samples (int): Number of samples to delay for the echo effect (default is 512).
-        - decay_factor (float): Factor to attenuate the delayed signal (default is 1.2).
+        - input_array (numpy.ndarray): Input audio signal.
+        - delay_samples (int): Number of samples to delay for the echo effect (default is 1024).
+        - decay_factor (float): Factor to attenuate the delayed signal (default is 0.8).
 
         Returns:
         - numpy.ndarray: Audio signal with echo effect applied.
         """
-        output = np.zeros(len(input) + delay_samples, dtype=np.int16)  # Initialize an array for the output signal
-        input_padded = np.pad(input, (delay_samples, 0), mode='constant')  # Pad the input signal for delayed samples
+        global global_echo_buffer, global_echo_pointer
+        
+        # Initialize an array to store the output signal with echo
+        output_signal = np.zeros(len(input_array) + delay_samples, dtype=np.int16)
+        
+        # Pad the input signal with zeros to accommodate the delayed samples
+        input_padded = np.pad(input_array, (delay_samples, 0), mode='constant')
 
-        for i in range(len(input)):
-            output[i] += input_padded[i]  # Add the direct audio to the output
-            if i - delay_samples >= 0:
-                # Add the delayed audio with attenuation to the output
-                output[i] += int(input_padded[i - delay_samples] * decay_factor)
+        for i in range(len(input_array)):
+            # Add the current sample from the input signal
+            output_signal[i] += input_padded[i]
+            
+            # Add the delayed signal with decay factor
+            output_signal[i] += int(global_echo_buffer[global_echo_pointer] * decay_factor)
+            
+            # Update the echo buffer with the current sample
+            global_echo_buffer[global_echo_pointer] = output_signal[i]
+            
+            # Update the echo buffer pointer (circular buffer)
+            global_echo_pointer = (global_echo_pointer + 1) % delay_samples
 
-        return output[:len(input)]  # Trim the output to match the length of the input
-
+        return output_signal[:len(input_array)]
 
     @staticmethod
-    def robotize_effect(input: np.ndarray, sr: int = 16000, mod_freq: int = 100, pitch_shift_steps: int = -2) -> np.ndarray:
+    def robotize_effect(input_array: np.ndarray, sr: int = 16000, mod_freq: int = 100, pitch_shift_steps: int = -2) -> np.ndarray:
         """
         Apply a robotic effect to the input signal with amplitude modulation and pitch shift.
 
+        This function modulates the input audio signal with amplitude modulation and applies pitch shift.
+
         Parameters:
-        - input (numpy.ndarray): Input audio signal.
+        - input_array (numpy.ndarray): Input audio signal.
         - sr (int): Sampling rate of the audio signal (default is 16000).
         - mod_freq (int): Modulation frequency for amplitude modulation (default is 100).
         - pitch_shift_steps (int): Number of pitch shift steps (default is -2).
@@ -73,66 +103,72 @@ class Filters:
         - numpy.ndarray: Audio signal with robotic effect applied.
         """
         # Convert input to float for processing
-        input_float = input.astype(float)
-
-        # Apply amplitude modulation for a robotic effect
+        input_float = input_array.astype(float)
+        
+        # Create a time vector for modulation
         t = np.linspace(0, len(input_float) / sr, num=len(input_float))
+        
+        # Generate amplitude modulation using a cosine function
         modulation = (1 + np.cos(2 * np.pi * mod_freq * t)) / 2
+        
+        # Apply amplitude modulation to the input signal
         modulated = input_float * modulation
-
+        
         # Calculate the pitch shift factor
         pitch_shift_factor = 2 ** (pitch_shift_steps / 12.0)
-
+        
         # Apply pitch shift without using librosa
         pitch_shifted = np.interp(np.arange(0, len(modulated), pitch_shift_factor),
                                 np.arange(len(modulated)),
                                 modulated)
-
+        
         return pitch_shifted.astype(np.int16)
 
-
     @staticmethod
-    def male_effect(input: np.ndarray, pitch_shift_steps: int = -3) -> np.ndarray:
+    def male_effect(input_array: np.ndarray, pitch_shift_steps: int = -3) -> np.ndarray:
         """
         Apply a pitch shift to make the input signal sound like a male voice.
 
+        This function shifts the pitch of the input audio signal to simulate a male voice.
+
         Parameters:
-        - input (numpy.ndarray): Input audio signal.
+        - input_array (numpy.ndarray): Input audio signal.
         - pitch_shift_steps (int): Number of pitch shift steps (default is -3).
 
         Returns:
         - numpy.ndarray: Audio signal with male voice pitch shift applied.
         """
         # Convert input to float for processing
-        input_float = input.astype(float)
+        input_float = input_array.astype(float)
 
         # Calculate the pitch shift factor
         pitch_shift_factor = 2 ** (pitch_shift_steps / 12.0)
 
-        # Apply pitch shift without using librosa
+        # Apply pitch shift
         pitch_shifted = np.interp(np.arange(0, len(input_float), pitch_shift_factor),
                                 np.arange(len(input_float)),
                                 input_float)
 
         return pitch_shifted.astype(np.int16)
-
-
+    
     @staticmethod
-    def female_effect(input: np.ndarray, pitch_shift_steps: int = 3) -> np.ndarray:
+    def baby_effect(input_array: np.ndarray, pitch_shift_steps: int = 10) -> np.ndarray:
         """
-        Apply a pitch shift to make the input signal sound like a female voice.
+        Apply a baby pitch effect to the input signal.
+
+        This function shifts the pitch of the input audio signal to simulate a baby voice.
 
         Parameters:
-        - input (numpy.ndarray): Input audio signal.
-        - pitch_shift_steps (int): Number of pitch shift steps (default is 3).
+        - input_array (numpy.ndarray): Input audio signal.
+        - pitch_shift_steps (int): Number of pitch shift steps (default is 10).
 
         Returns:
-        - numpy.ndarray: Audio signal with female voice pitch shift applied.
+        - numpy.ndarray: Audio signal with baby pitch effect applied.
         """
         # Convert input to float for processing
-        input_float = input.astype(float)
+        input_float = input_array.astype(float)
 
-        # Calculate the pitch shift factor
+        # Calculate the pitch shift factor for a baby pitch
         pitch_shift_factor = 2 ** (pitch_shift_steps / 12.0)
 
         # Apply pitch shift without using librosa
@@ -142,11 +178,13 @@ class Filters:
 
         return pitch_shifted.astype(np.int16)
 
-    
+
     @staticmethod
     def ping_pong_effect(input_array: np.ndarray) -> np.ndarray:
         """
         Apply a ping-pong effect to the input audio signal.
+
+        This function creates a stereo ping-pong effect by storing and delaying samples alternately.
 
         Parameters:
         - input_array (numpy.ndarray): Input audio signal.
@@ -154,19 +192,19 @@ class Filters:
         Returns:
         - numpy.ndarray: Audio signal with ping-pong effect applied (stereo output).
         """
-        global ping_pong_buffer, ping_pong_pointer
+        global global_ping_pong_buffer, global_ping_pong_pointer
 
         # Length of the ping-pong buffer
-        N = len(ping_pong_buffer)
+        N = len(global_ping_pong_buffer)
 
         # Initialize the output array with stereo channels
         output = np.zeros((len(input_array), 2))
 
         for i, x in enumerate(input_array):
             # Store the current sample in the buffer and get the delayed sample
-            delayed_sample = ping_pong_buffer[ping_pong_pointer]
-            ping_pong_buffer[ping_pong_pointer] = x
-            ping_pong_pointer = (ping_pong_pointer + 1) % N
+            delayed_sample = global_ping_pong_buffer[global_ping_pong_pointer]
+            global_ping_pong_buffer[global_ping_pong_pointer] = x
+            global_ping_pong_pointer = (global_ping_pong_pointer + 1) % N
 
             # Assign direct and delayed audio to alternate channels
             if i % N < N // 2:
@@ -178,11 +216,13 @@ class Filters:
 
         return output
 
-    
+
     @staticmethod
     def alternate_channels(input_array: np.ndarray, samples_per_alternation: int = 1024) -> np.ndarray:
         """
         Apply an alternate channels effect to the input audio signal.
+
+        This function alternates the output between left and right channels at each period.
 
         Parameters:
         - input_array (numpy.ndarray): Input audio signal.
@@ -203,62 +243,80 @@ class Filters:
                 # Second half: Output to right channel
                 output[i, 0] = 0
                 output[i, 1] = x
+        return output
+
+
+    @staticmethod
+    def mutation_effect(input_array: np.ndarray, rate: int = RATE, f0: float = 7, depth: float = 0.2, buffer_len: int = 1024) -> np.ndarray:
+        """
+        Apply an optimized vibrato effect to the input signal.
+
+        This function applies a vibrato effect to the input audio signal.
+
+        Parameters:
+        - input_array (numpy.ndarray): Input audio signal.
+        - rate (int): Sampling rate of the audio signal.
+        - f0 (float): Frequency of the vibrato modulation (Hz).
+        - depth (float): Depth of the vibrato effect.
+        - buffer_len (int): Length of the delay buffer.
+
+        Returns:
+        - numpy.ndarray: Audio signal with vibrato effect applied.
+        """
+        global global_vibrato_buffer, global_vibrato_pointers
+        buffer_len = len(global_vibrato_buffer)
+        kr, kw = global_vibrato_pointers
+        output = np.zeros_like(input_array)
+        mod_index = depth * np.sin(2 * math.pi * f0 * np.arange(len(input_array)) / rate)
+
+        for n, x in enumerate(input_array):
+            global_vibrato_buffer[kw] = x
+            kr_int = int(np.floor(kr))
+            frac = kr - kr_int
+            y = (1 - frac) * global_vibrato_buffer[kr_int] + frac * global_vibrato_buffer[(kr_int + 1) % buffer_len]
+            output[n] = y
+            kr = (kr + 1 + mod_index[n]) % buffer_len
+            kw = (kw + 1) % buffer_len
+
+        global_vibrato_pointers = [kr, kw]
+        return output
+
+    @staticmethod
+    def drunk(input_array: np.ndarray, rate: int = RATE, delay_sec: float = 0.2) -> np.ndarray:
+        """
+        Apply a drunk effect to the input audio signal.
+
+        This function simulates a drunk effect by combining the current sample with a delayed sample.
+
+        Parameters:
+        - input_array (numpy.ndarray): Input audio signal.
+        - rate (int): Sampling rate of the audio signal.
+        - delay_sec (float): Delay in seconds.
+
+        Returns:
+        - numpy.ndarray: Audio signal with drunk effect applied.
+        """
+        buffer_len = int(delay_sec * rate)
+        buffer = [0] * buffer_len
+        k = 0
+        output = np.zeros(len(input_array))
+
+        for i, x_i in enumerate(input_array):
+            # Apply drunk effect by combining the current sample with a delayed sample
+            y_i = x_i * np.cos(i) + x_i * np.sin(i) + buffer[k]
+            output[i] = y_i
+            buffer[k] = x_i
+            k = (k + 1) % buffer_len
 
         return output
 
-    
-    # @staticmethod
-    # def autobots(input_array, rate = RATE, dly_in_sec=0.2, delay_gain=1):
-    #     bufferLen = int(rate * dly_in_sec)
-    #     buffer = bufferLen * [0]
-    #     k = 0
-    #     output = np.zeros(len(input_array))
-
-    #     for i, x_i in enumerate(input_array):
-    #         output[i] = x_i * np.cos(2 * np.pi * 0.6 * i) + delay_gain * buffer[k]
-    #         buffer[k] = output[i]
-    #         k = (k + 1) % len(buffer)
-
-    #     return output
-    
-    # @staticmethod
-    # def drunk(input_array, rate = RATE, delay_sec=0.2):
-    #     bufferLen = int(delay_sec * rate)
-    #     buffer = [0] * bufferLen
-    #     k = 0
-    #     output = np.zeros(len(input_array))
-
-    #     for i, x_i in enumerate(input_array):
-    #         y_i = x_i * np.cos(i) + x_i * np.sin(i) + buffer[k]
-    #         output[i] = y_i
-    #         buffer[k] = x_i
-    #         k = (k + 1) % bufferLen
-
-    #     return output
-    
-    # def autobots(input, sr=16000, vibrato_rate=7, vibrato_depth=70):
-    #     """
-    #     Apply a vibrato effect to the input signal.
-        
-    #     :param input: Input audio signal (numpy array).
-    #     :param sr: Sampling rate of the audio signal.
-    #     :param vibrato_rate: Rate of vibrato in Hz.
-    #     :param vibrato_depth: Depth of vibrato in samples.
-    #     :return: Vibrato applied audio signal.
-    #     """
-    #     output = np.zeros_like(input)
-    #     t = np.arange(len(input))
-    #     vibrato = vibrato_depth * np.sin(2 * np.pi * vibrato_rate * t / sr)
-    #     for i in range(len(input)):
-    #         vibrato_index = int(i + vibrato[i])
-    #         if 0 <= vibrato_index < len(input):
-    #             output[i] = input[vibrato_index]
-    #     return output.astype(np.int16)
     @staticmethod
     def flanger_effect(input_array: np.ndarray, sr: int = 16000, delay: float = 0.03, depth: float = 0.02, rate: float = 0.55) -> np.ndarray:
         """
         Apply a flanger effect to the input audio signal.
-        
+
+        This function modulates the delay to create a flanger effect.
+
         Parameters:
         - input_array (numpy.ndarray): Input audio signal.
         - sr (int): Sampling rate of the audio signal.
@@ -269,14 +327,15 @@ class Filters:
         Returns:
         - numpy.ndarray: Audio signal with flanger effect applied.
         """
-        output = np.zeros_like(input_array)
+        global global_flanger_buffer, global_flanger_pointer
         max_delay = int((delay + depth) * sr)
-        
-        for i in range(max_delay, len(input_array)):
-            # Calculate the modulated delay based on the modulation depth and rate
+        output = np.zeros_like(input_array)
+
+        for i in range(len(input_array)):
             mod_delay = int(delay * sr + depth * sr * np.sin(2 * np.pi * rate * i / sr))
-            
-            # Apply the flanger effect by combining the current sample with a delayed sample
-            output[i] = input_array[i] + input_array[i - mod_delay]
+            global_flanger_buffer[global_flanger_pointer] = input_array[i]
+            flanger_index = (global_flanger_pointer - mod_delay + len(global_flanger_buffer)) % len(global_flanger_buffer)
+            output[i] = input_array[i] + global_flanger_buffer[flanger_index]
+            global_flanger_pointer = (global_flanger_pointer + 1) % len(global_flanger_buffer)
 
         return output.astype(np.int16)

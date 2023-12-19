@@ -22,9 +22,10 @@ audio_length = 0                 # Length of the audio in seconds
 is_playing = False                # Indicates whether the audio is currently playing
 paused_position = 0              # The position where playback was paused (in milliseconds)
 update_bar_thread_running = False # Flag to control the thread updating the play bar
+last_played_button = None        # Represents the last played audio button for audio_clips
 
 # Global Variables for Microphone and Real-time Audio Processing
-MIC_RATE = 8000            # Microphone sampling rate in frames per second
+MIC_RATE = 16000            # Microphone sampling rate in frames per second
 MIC_CHANNELS = 2            # Number of channels for the microphone
 BLOCKLEN = 2048             # Number of frames per block for real-time audio processing
 
@@ -48,7 +49,7 @@ audio_thread = None             # Thread for audio playback
 current_active_button = None    # Currently active button for audio playback control
 is_audio_playing = False         # Indicates whether any audio is currently playing
 current_filter = ""              # Currently selected audio filter
-filter_options = ["Normal", "Alien Voice", "Robotic Voice", "Male Voice", "Female Voice", "Echoed Voice", "Ping Pong Voice", "Alternate Channel Effect", "Else"]
+filter_options = ["Normal", "Alien Voice", "Robotic Voice", "Male Voice", "Female Voice", "Baby Voice", "Echoed Voice", "Ping Pong Voice", "Alternate Channel Effect", "Mutation Effect", "Flanger Effect"]
 
 # Global Variables for UI Styling
 button_off_color = "#3498DB"    # Color when buttons are off or not pressed
@@ -315,14 +316,18 @@ def process_realtime_audio() -> None:
                 output_array = Filters.male_effect(input_array)
             elif current_filter == "Female Voice":
                 output_array = Filters.female_effect(input_array)
+            elif current_filter == "Baby Voice":
+                output_array = Filters.baby_effect(input_array)
             elif current_filter == "Echoed Voice":
                 output_array = Filters.echo_effect(input_array)
             elif current_filter == "Ping Pong Voice":
                 output_array = Filters.ping_pong_effect(input_array)
             elif current_filter == "Alternate Channel Effect":
                 output_array = Filters.alternate_channels(input_array)
-            elif current_filter == "Else":
-                output_array = Filters.autobots(input_array)
+            elif current_filter == "Mutation Effect":
+                output_array = Filters.mutation_effect(input_array)
+            elif current_filter == "Flanger Effect":
+                output_array = Filters.flanger_effect(input_array)
             else:
                 output_array = input_array  # No modulation if no button is selected
         else:
@@ -350,7 +355,6 @@ def on_filter_click() -> None:
         on_filter_click()
     """
     # Access the global variable that tracks the currently selected audio button
-    print(f"Filter button clicked")
     UI.toggle_button_color(filter_button, canvas, microphone_button, filter_button, output_button)
 
 def start_stream() -> None:
@@ -431,7 +435,6 @@ def on_upload_audio() -> None:
         raw_play_bar.set(0)
 
         # Update the UI with the selected file's name and enable the Convert button
-        print(f"Selected file: {file_path}")
         shortened_file_name = Utils.shorten_file_name(file_path, max_chars=15)
         selected_file_label.config(text=f"Selected File: {shortened_file_name}")
         convert_button.config(state=tk.NORMAL)  # Enable the Convert button
@@ -503,8 +506,6 @@ def on_convert() -> None:
 
     # Check if a file is selected
     if selected_file_path:
-        print(f"Converting {selected_file_path}...")
-
         # Open the selected audio file for reading
         wf = wave.open(selected_file_path, 'rb')
 
@@ -532,14 +533,18 @@ def on_convert() -> None:
                 modulated_array = Filters.male_effect(input_array)
             elif current_filter == "Female Voice":
                 modulated_array = Filters.female_effect(input_array)
+            elif current_filter == "Baby Voice":
+                modulated_array = Filters.baby_effect(input_array)
             elif current_filter == "Echoed Voice":
                 modulated_array = Filters.echo_effect(input_array)
             elif current_filter == "Ping Pong Voice":
                 modulated_array = Filters.ping_pong_effect(input_array)
             elif current_filter == "Alternate Channel Effect":
                 modulated_array = Filters.alternate_channels(input_array)
-            elif current_filter == "Else":
-                modulated_array = Filters.autobots(input_array)
+            elif current_filter == "Mutation Effect":
+                modulated_array = Filters.mutation_effect(input_array)
+            elif current_filter == "Flanger Effect":
+                modulated_array = Filters.flanger_effect(input_array)
         else:
             # Show a dialog if the filter is not turned on
             Utils.show_select_audio_dialog()
@@ -607,7 +612,6 @@ def play_modulated_audio() -> None:
 
     # Ensure the modulated audio data is not None
     if modulated_audio_data is None:
-        print("No modulated audio data to play.")
         return
 
     # Start playing the modulated audio from the beginning
@@ -773,7 +777,6 @@ def download_modulated_audio() -> None:
 
     # Check if modulated audio data is available
     if modulated_audio_data is None:
-        print("No modulated audio to save.")
         return
 
     # Extract the original filename without extension
@@ -824,9 +827,6 @@ def on_closing() -> None:
     # Set the flag to stop the update thread
     update_bar_thread_running = False
 
-    # Print a message to the console
-    print("Window closed")
-
     # Destroy the main window
     window.destroy()
     
@@ -847,6 +847,9 @@ def open_audio_clips_window() -> None:
     # Create a new Toplevel window
     clips_window = tk.Toplevel(window)
     clips_window.title("Audio Clips")
+
+    # Bind the callback function to the window close event
+    clips_window.wm_protocol("WM_DELETE_WINDOW", lambda: stop_audio_on_window_close(clips_window))
 
     # Fetch audio files
     audio_files = fetch_audio_files()
@@ -872,6 +875,30 @@ def open_audio_clips_window() -> None:
 
         # Place the button in the grid layout
         btn.grid(row=i // 3, column=i % 3, sticky='nsew', padx=button_padx, pady=button_pady)
+
+def stop_audio_on_window_close(window: tk.Toplevel) -> None:
+    """
+    Stop audio playback when the window is closed.
+
+    Parameters:
+        window (tk.Toplevel): The Toplevel window.
+
+    Returns:
+        None
+    """
+    global current_play_obj, audio_thread, current_active_button, is_audio_playing
+
+    # Stop the currently playing audio if there is one
+    if is_audio_playing:
+        current_play_obj.stop()
+        is_audio_playing = False
+
+        # Reset the color of the previous active button
+        if current_active_button:
+            current_active_button.config(background=button_off_color)
+
+    # Destroy the window
+    window.destroy()
 
 def fetch_audio_files() -> dict:
     """
@@ -916,7 +943,7 @@ def play_audio(file_path: str, button: tk.Button) -> None:
     Global Variables:
         current_play_obj (SimpleAudioObject): Represents the current audio playback object.
         audio_thread (threading.Thread): Represents the thread used for audio playback.
-        current_active_button (tk.Button): Represents the currently active audio playback button.
+        last_played_button (tk.Button): Represents the last played audio button.
         is_audio_playing (bool): Indicates whether audio is currently playing.
 
     Returns:
@@ -926,11 +953,13 @@ def play_audio(file_path: str, button: tk.Button) -> None:
     the associated button. It starts a new thread for audio playback and stops the currently
     playing audio if there is one.
 
+    If the same button is clicked again, the playback is restarted.
+
     Example usage:
         play_audio("/path/to/audio/file.mp3", play_button)
     """
     # Use the global variables
-    global current_play_obj, audio_thread, current_active_button, is_audio_playing
+    global current_play_obj, audio_thread, last_played_button, is_audio_playing
 
     def audio_worker():
         """
@@ -955,25 +984,28 @@ def play_audio(file_path: str, button: tk.Button) -> None:
 
             # Audio finished playing
             is_audio_playing = False
-            button.config(background=button_off_color)
         except Exception as e:
             # Handle errors during audio playback
             print(f"Error playing file {file_path}: {e}")
-            is_audio_playing = False
-            button.config(background=button_on_color)
+        finally:
+            # Reset the color of the button (even if an error occurs)
+            button.config(background=button_off_color)
 
     # Stop the currently playing audio if there is one
     if is_audio_playing:
         current_play_obj.stop()
         is_audio_playing = False
 
-        # Reset the color of the previous active button
-        if current_active_button and current_active_button != button:
-            current_active_button.config(background=button_off_color)
+        # Reset the color of the last played button
+        if last_played_button and last_played_button != button:
+            last_played_button.config(background=button_off_color)
 
-    # Start a new thread for the new audio if not already playing the same audio
-    if not is_audio_playing or current_active_button != button:
-        current_active_button = button
+    # If the same button is clicked again, restart the playback
+    if last_played_button == button:
+        current_play_obj.stop()
+        is_audio_playing = False
+    else:
+        last_played_button = button
         audio_thread = threading.Thread(target=audio_worker)
         audio_thread.start()
 

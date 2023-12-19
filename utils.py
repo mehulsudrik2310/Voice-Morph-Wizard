@@ -1,4 +1,5 @@
 import os
+import shutil
 import tkinter as tk
 from tkinter import messagebox
 from ui import UI
@@ -68,26 +69,47 @@ class Utils:
         if current_filter == "Normal":
             filter_button.data["is_on"] = True
             UI.toggle_button_color(filter_button, canvas, microphone_button, filter_button, output_button)
-    
 
     @staticmethod
     def on_upload_effects() -> None:
         """
-        Open a file dialog to upload an effects file.
+        Open a file dialog to upload an audio file.
 
         Returns:
             None
 
-        This method opens a file dialog to allow the user to upload an effects file.
-        If a file is selected, the file path is printed to the console.
+        This method opens a file dialog to allow the user to upload an audio file.
+        If a file is selected and its duration is less than or equal to 10 seconds,
+        a copy of the file is saved in the 'audio_clips' folder within the 'voice_changer' directory.
+        If the duration exceeds 10 seconds, an error message is displayed.
 
         Example usage:
-            YourClass.on_upload_effects()
+            YourClass.on_upload_audio()
         """
-        # Open a file dialog to select an effects file
-        effects_path = filedialog.askopenfilename(title="Upload Effects File", filetypes=[("Audio Files", "*.mp3;*.wav")])
+        # Open a file dialog to select an audio file
+        audio_path = filedialog.askopenfilename(title="Upload Audio File", filetypes=[("Audio Files", "*.mp3;*.wav")])
 
         # Check if a file was selected
-        if effects_path:
-            # Print the path of the uploaded effects file to the console
-            print(f"Effects file uploaded: {effects_path}")
+        if audio_path:
+            # Get the filename from the selected audio file path
+            audio_filename = os.path.basename(audio_path)
+
+            # Calculate the duration of the audio file
+            audio_duration = AudioSegment.from_file(audio_path).duration_seconds
+
+            # Check if the duration is greater than 10 seconds
+            if audio_duration > 10:
+                # Show an error message box if the duration exceeds 10 seconds
+                messagebox.showerror("Error", "Selected audio file is larger than 10 seconds. Please choose a shorter file.")
+            else:
+                # Get the 'audio_clips' folder within the 'voice_changer' directory
+                audio_clips_folder = os.path.join(os.path.dirname(__file__), 'audio_clips')
+
+                # Generate the destination path for the copy in the 'audio_clips' folder
+                destination_path = os.path.join(audio_clips_folder, audio_filename)
+
+                # Copy the selected audio file to the 'audio_clips' folder
+                shutil.copy2(audio_path, destination_path)
+
+                # Show a success message box
+                messagebox.showinfo("Upload Successful", f"Audio file '{audio_filename}' has been uploaded and saved.")
