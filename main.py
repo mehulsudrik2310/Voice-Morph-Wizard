@@ -510,11 +510,6 @@ def on_convert() -> None:
     if selected_file_path:
         # Check the file extension
         file_extension = selected_file_path.split('.')[-1].lower()
-        print("BEFORE")
-        print(LENGTH)
-        print(WIDTH)
-        print(CHANNELS)
-
         if file_extension == 'wav':
             # Read the WAV file
             wf = wave.open(selected_file_path, 'rb')
@@ -522,10 +517,6 @@ def on_convert() -> None:
             RATE = wf.getframerate()
             WIDTH = wf.getsampwidth()
             LENGTH = wf.getnframes()
-            print("IN WAV")
-            print(LENGTH)
-            print(WIDTH)
-            print(CHANNELS)
             input_bytes = wf.readframes(LENGTH)
             wf.close()
         elif file_extension == 'mp3':
@@ -535,10 +526,6 @@ def on_convert() -> None:
             RATE = audio.frame_rate
             WIDTH = audio.sample_width
             LENGTH = len(audio.raw_data) // (WIDTH * CHANNELS)
-            print("IN MP3")
-            print(LENGTH)
-            print(WIDTH)
-            print(CHANNELS)
             input_bytes = np.array(audio.get_array_of_samples()).astype('int16').tobytes()
         else:
             # Unsupported file format
@@ -645,10 +632,7 @@ def play_modulated_audio() -> None:
     remainder = len(modulated_audio_data) % (WIDTH * CHANNELS)
     if remainder != 0:
         modulated_audio_data += b'\x00' * (WIDTH * CHANNELS - remainder)
-    print("IN PLAY MODULATED")
-    print(LENGTH)
-    print(WIDTH)
-    print(CHANNELS)
+    
     # Start playing the modulated audio from the beginning
     modulated_audio_segment = AudioSegment(
         data=modulated_audio_data,
@@ -968,81 +952,40 @@ def fetch_audio_files() -> dict:
     return audio_files
 
 def play_audio(file_path: str, button: tk.Button) -> None:
-    """
-    Play audio from a specified file path and update the button appearance.
-
-    Parameters:
-        file_path (str): The path to the audio file to be played.
-        button (tk.Button): The Tkinter button associated with playing the audio.
-
-    Global Variables:
-        current_play_obj (SimpleAudioObject): Represents the current audio playback object.
-        audio_thread (threading.Thread): Represents the thread used for audio playback.
-        last_played_button (tk.Button): Represents the last played audio button.
-        is_audio_playing (bool): Indicates whether audio is currently playing.
-
-    Returns:
-        None
-
-    This function plays audio from the specified file path and updates the appearance of
-    the associated button. It starts a new thread for audio playback and stops the currently
-    playing audio if there is one.
-
-    If the same button is clicked again, the playback is restarted.
-
-    Example usage:
-        play_audio("/path/to/audio/file.mp3", play_button)
-    """
-    # Use the global variables
     global current_play_obj, audio_thread, last_played_button, is_audio_playing
 
     def audio_worker():
-        """
-        Worker function for audio playback in a separate thread.
-
-        This function handles the audio playback, updates the button color while playing,
-        and resets the button color when the audio finishes or an error occurs.
-        """
         global current_play_obj, is_audio_playing
         try:
-            # Change the button color to green while playing
             button.config(background="#2ECC71")
-
-            # Create a SimpleAudioObject from the audio file and play it
             wave_obj = sa.WaveObject.from_wave_file(file_path)
             current_play_obj = wave_obj.play()
             is_audio_playing = True
 
-            # Wait for the audio to finish playing
             while current_play_obj.is_playing():
                 time.sleep(0.1)
 
-            # Audio finished playing
             is_audio_playing = False
         except Exception as e:
-            # Handle errors during audio playback
             print(f"Error playing file {file_path}: {e}")
         finally:
-            # Reset the color of the button (even if an error occurs)
             button.config(background=button_off_color)
 
-    # Stop the currently playing audio if there is one
+    # Stop any currently playing audio
     if is_audio_playing:
         current_play_obj.stop()
         is_audio_playing = False
 
-        # Reset the color of the last played button
+        # Reset the color of the last played button if it's different
         if last_played_button and last_played_button != button:
             last_played_button.config(background=button_off_color)
 
-    # If the same button is clicked again, restart the playback
-    if last_played_button == button:
-        current_play_obj.stop()
-        is_audio_playing = False
-    else:
-        last_played_button = button
-        audio_thread = threading.Thread(target=audio_worker)
-        audio_thread.start()
+    # Set the last played button to the current one
+    last_played_button = button
+
+    # Start a new thread for audio playback
+    audio_thread = threading.Thread(target=audio_worker)
+    audio_thread.start()
 
 def on_filter_option_change(event: tk.Event) -> None:
     """
