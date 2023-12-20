@@ -1,1 +1,1 @@
-# Wizard Voice Morph
+# Voice Morph Wizard
