@@ -2,7 +2,7 @@ import math
 from scipy import signal
 import numpy as np
 
-RATE = 8000
+RATE = 16000
 
 # Global variables for various effects
 global_theta = 0  # For alien effect
