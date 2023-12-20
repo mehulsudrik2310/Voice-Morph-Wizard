@@ -502,22 +502,48 @@ def on_convert() -> None:
         on_convert()
     """
     # Use global variables
-    global selected_file_path, modulated_audio_data, modulated_audio_length, modulated_play_button, modulated_pause_continue_button, modulated_play_bar, modulated_is_playing, modulated_paused_position, modulated_update_bar_thread_running, modulated_play_obj, current_filter, CHANNELS, RATE, WIDTH, LENGTH
+    global selected_file_path, modulated_audio_data, modulated_audio_length, modulated_play_button, modulated_pause_continue_button
+    global modulated_play_bar, modulated_is_playing, modulated_paused_position, modulated_update_bar_thread_running, modulated_play_obj, current_filter
+    global CHANNELS, RATE, WIDTH, LENGTH
 
     # Check if a file is selected
     if selected_file_path:
-        # Open the selected audio file for reading
-        wf = wave.open(selected_file_path, 'rb')
+        # Check the file extension
+        file_extension = selected_file_path.split('.')[-1].lower()
+        print("BEFORE")
+        print(LENGTH)
+        print(WIDTH)
+        print(CHANNELS)
 
-        # Retrieve audio properties
-        CHANNELS = wf.getnchannels()     # Number of channels
-        RATE = wf.getframerate()     # Sampling rate (frames/second)
-        WIDTH = wf.getsampwidth()     # Number of bytes per sample
-        LENGTH = wf.getnframes()    # Number of frames in the audio
-
-        # Read the entire file
-        input_bytes = wf.readframes(LENGTH)
-        wf.close()  # Close the file after reading
+        if file_extension == 'wav':
+            # Read the WAV file
+            wf = wave.open(selected_file_path, 'rb')
+            CHANNELS = wf.getnchannels()
+            RATE = wf.getframerate()
+            WIDTH = wf.getsampwidth()
+            LENGTH = wf.getnframes()
+            print("IN WAV")
+            print(LENGTH)
+            print(WIDTH)
+            print(CHANNELS)
+            input_bytes = wf.readframes(LENGTH)
+            wf.close()
+        elif file_extension == 'mp3':
+            # Read the MP3 file and convert it to WAV
+            audio = AudioSegment.from_mp3(selected_file_path)
+            CHANNELS = audio.channels
+            RATE = audio.frame_rate
+            WIDTH = audio.sample_width
+            LENGTH = len(audio.raw_data) // (WIDTH * CHANNELS)
+            print("IN MP3")
+            print(LENGTH)
+            print(WIDTH)
+            print(CHANNELS)
+            input_bytes = np.array(audio.get_array_of_samples()).astype('int16').tobytes()
+        else:
+            # Unsupported file format
+            Utils.show_select_audio_dialog()
+            return
 
         # Convert the input bytes to a numpy array
         input_array = np.frombuffer(input_bytes, dtype='int16')
@@ -596,7 +622,8 @@ def play_modulated_audio() -> None:
         play_modulated_audio()
     """
     # Use global variables
-    global modulated_audio_data, modulated_play_obj, modulated_is_playing, modulated_paused_position, modulated_update_bar_thread_running, CHANNELS, WIDTH, RATE
+    global modulated_audio_data, modulated_play_obj, modulated_is_playing, modulated_paused_position, modulated_update_bar_thread_running
+    global CHANNELS, WIDTH, RATE
 
     # Stop any existing playback and updating thread
     if modulated_play_obj:
@@ -613,7 +640,15 @@ def play_modulated_audio() -> None:
     # Ensure the modulated audio data is not None
     if modulated_audio_data is None:
         return
-
+    
+    # Ensure that the length is a multiple of '(WIDTH * CHANNELS)'
+    remainder = len(modulated_audio_data) % (WIDTH * CHANNELS)
+    if remainder != 0:
+        modulated_audio_data += b'\x00' * (WIDTH * CHANNELS - remainder)
+    print("IN PLAY MODULATED")
+    print(LENGTH)
+    print(WIDTH)
+    print(CHANNELS)
     # Start playing the modulated audio from the beginning
     modulated_audio_segment = AudioSegment(
         data=modulated_audio_data,
